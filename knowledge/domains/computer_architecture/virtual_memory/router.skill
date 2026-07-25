@@ -1,0 +1,76 @@
+# Metadata
+
+Name: virtual_memory-router
+Category: router
+Tags: [router, virtual-memory, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `virtual_memory` 這個 sub-domain 的問題（虛擬記憶體概念、page table、TLB），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `virtual_memory` | 虛擬記憶體的動機與基本機制：位址轉換、保護、記憶體超額配置 |
+| `page_table` | 虛擬位址如何透過分頁表對應到實體位址 |
+| `tlb` | 加速位址轉換的專用 cache |
+
+---
+
+# Theory
+
+`virtual_memory` 是最上層的概念先備知識；`page_table` 是實現虛擬記憶體位址轉換的具體資料結構；`tlb` 則是針對 `page_table` 查詢過慢這個問題的加速機制——三者是嚴格的遞進關係，計畫書 section 6 給的範例（問 TLB 要同時載入 virtual_memory、page_table、cache）正是這個依賴鏈的體現。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `page_table` 展開依賴到 `virtual_memory`；`tlb` 展開依賴到 `virtual_memory`、`page_table`。
+3. 問題若牽涉「TLB 本身的結構」，額外參考 `cache/cache`（TLB 本質上是一個小型 cache），由上層 router 判斷跨 sub-domain 依賴。
+
+---
+
+# Example
+
+```
+問題：TLB miss 發生時會怎麼處理？
+直接對應: tlb
+Requires 展開: virtual_memory, page_table
+最終載入: virtual_memory, page_table, tlb
+（可能還需要 cache/cache 作為 TLB 結構的類比參考）
+```
+
+---
+
+# Common Mistakes
+
+- 把「page table 查詢」跟「TLB 查詢」當成互相獨立的兩條路徑——TLB 本質上是 page table 部分內容的快取，兩者是同一個位址轉換流程的不同層次，不是平行的兩套機制。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`virtual_memory` router 依「虛擬記憶體概念 → page table 具體結構 → TLB 加速機制」的遞進關係，判斷相關問題該載入的 Topic Skill。

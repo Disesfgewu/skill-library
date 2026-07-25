@@ -1,0 +1,92 @@
+# Metadata
+
+Name: page_table
+Category: computer_architecture/virtual_memory
+Tags: [page-table, multi-level-paging, page-fault, virtual-memory]
+Dependencies: [virtual_memory]
+Related Skills: [tlb]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`virtual_memory` 說明虛擬位址要轉換成實體位址,但沒說這個「查表」的表**長什麼樣子**、有多大、怎麼組織才不會自己先佔用太多記憶體。Page Table 就是這張表的具體實作，而它的設計本身也要面對一個現實問題：如果每個 process 都要有一張完整的表，這張表本身的大小就可能大到不合理。
+
+---
+
+# Concepts
+
+- **Page Table Entry（PTE）**：page table 中的一筆記錄，通常包含：對應的實體頁框編號、valid bit（這個分頁目前是否真的在實體記憶體中）、保護位元（可讀/可寫/可執行）、其他狀態位元（例如 dirty bit：是否被寫過）。
+- **單層 Page Table**：最直觀的設計，用 Virtual Page Number 直接索引一張大表。
+- **多層 Page Table（Multi-level Paging）**：把單層大表拆成多層、樹狀結構，只有實際用到的部分才需要真的配置記憶體。
+- **Page Fault（分頁錯誤）**：存取一個 valid bit 為 0 的分頁（代表這個分頁目前不在實體記憶體中，可能還沒被配置、或被換出到硬碟），觸發作業系統介入處理。
+
+---
+
+# Theory
+
+## 為什麼需要多層 Page Table
+
+假設 32-bit 虛擬位址空間、4KB page size：Virtual Page Number 佔 20 bits，代表單層 page table 需要 2^20（約 100 萬）個 entry。就算每個 entry 只佔 4 bytes，一張表就要 4MB——而且**每一個** process 都要有自己的一張表，即使這個 process 實際只用到很小一部分位址空間，單層設計仍然要求配置完整的 4MB。多層設計把這 20 bits 拆成多段（例如兩段各 10 bits），第一層表只有 2^10 = 1024 個 entry，每個 entry 若沒被用到就**不需要**指向任何第二層表——沒被實際使用的位址範圍，完全不佔用 page table 自己的記憶體空間，這是用「查詢多一步、多一次記憶體存取」換取「大幅節省 page table 本身佔用的空間」的具體取捨。
+
+## Page Table 查詢本身也要付出記憶體存取代價
+
+這是一個常被忽略、卻很關鍵的觀察：page table 本身存放在**主記憶體**裡（不是特殊硬體），查詢它就是**額外的記憶體存取**。多層設計下，一次完整的位址轉換可能需要走訪 2-4 層 page table，等於一次記憶體讀取（`lw`）實際上觸發了 2-4 次額外的記憶體存取（查表）再加上最終真正要讀的那次——如果每次都這樣做，代價極高。這正是 `tlb`（快取最近查過的轉換結果）存在的直接理由：TLB 命中時完全不需要走訪 page table，直接省下這 2-4 次額外存取。
+
+---
+
+# Hardware
+
+兩層 page table 的查詢流程示意（32-bit 位址，10+10+12 bits 切分）：
+```
+Virtual Address: | P1 (10 bits) | P2 (10 bits) | Offset (12 bits) |
+
+1. 用 P1 索引 Level-1 Table（存在一個固定、已知的實體位址）
+   -> 找到 Level-2 Table 的實體位址（若該 entry 無效，代表這整段範圍都沒配置，page fault）
+2. 用 P2 索引 Level-2 Table
+   -> 找到實際的 Physical Frame Number（若 valid bit = 0，page fault）
+3. Physical Address = Physical Frame Number ++ Offset
+```
+
+---
+
+# Software
+
+Page Fault 的處理流程（作業系統負責，硬體只負責偵測並觸發）：
+```
+1. 硬體查 page table，發現 valid bit = 0，觸發 page fault 例外（trap，見 domains/computer_architecture/linux）
+2. 作業系統的 page fault handler 介入：
+   a. 判斷這是合法的分頁（例如尚未配置的 heap/stack 成長）還是非法存取（segmentation fault）
+   b. 若合法：從硬碟載入對應內容到某個實體頁框（若實體記憶體已滿，先依置換策略踢出一個既有分頁）
+   c. 更新 page table，把 valid bit 設為 1、填入正確的 Physical Frame Number
+3. 重新執行原本觸發 page fault 的那個指令（這次 page table 已經是有效的，正常完成）
+```
+
+---
+
+# Example
+
+一個 process 的虛擬位址空間中，Text/Data 段落佔的範圍很小、集中在低位址，Stack 集中在高位址,中間絕大部分位址範圍完全沒被使用（見 `foundations/c_memory_layout` 的位址空間圖）。單層 page table 仍然要為這整個中間的空白範圍保留 entry（即使全部標記為無效，entry 本身還是佔空間）；多層 page table 下，對應這段空白範圍的 Level-1 entry 直接標記無效，完全不需要建立任何 Level-2 Table——這正是多層設計「只為實際用到的範圍付出空間代價」的具體效果。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「多層 page table 一定比單層更快」，這個直覺是錯的——多層設計是用**查詢速度**換取**空間效率**（見上方 Theory 段：多層需要多次額外的記憶體存取），單層設計如果真的能負擔得起那麼大的表，查詢反而更快（只需一次索引）。多層設計存在的理由是空間，不是速度，可以透過比較兩者在「查一次位址所需的記憶體存取次數」上驗證：單層恆為 1 次，多層需要 N 次（N 為層數）。
+- 把 Page Fault 跟一般的硬體例外混為一談、以為都是「錯誤」——Page Fault 在 demand paging 機制下是**正常且預期會發生**的事件（例如程式第一次存取某段剛配置的 heap 記憶體），不代表程式有 bug；只有當存取的位址完全超出這個 process 被允許的範圍時，才是真正的錯誤（會導致作業系統終止程式，例如常見的 segmentation fault）。
+
+---
+
+# Interview Questions
+
+- 多層 page table 用什麼代價換取「節省空間」這個好處？
+- Page Fault 發生時，為什麼處理完之後要「重新執行」觸發它的那個指令，而不是直接跳過？
+
+延伸思考：如果一個系統把 page size 從 4KB 改成 2MB（huge page），對 page table 的層數/大小、對 TLB 的命中率會分別造成什麼影響？這跟 `cache/cache` skill 中 cache block 大小的取捨有什麼相似之處？
+
+---
+
+# Summary
+
+Page Table 記錄虛擬分頁到實體頁框的對應，多層設計用「查詢需要多次記憶體存取」換取「未使用的位址範圍不佔用表本身的空間」；查表本身是額外的記憶體存取，代價隨層數增加，這是 TLB 存在的直接理由；Page Fault（valid bit 為 0）在 demand paging 下是正常事件，由作業系統介入載入分頁後重新執行原指令，不等於程式錯誤。

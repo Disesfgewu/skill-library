@@ -1,0 +1,102 @@
+# Metadata
+
+Name: tlb
+Category: computer_architecture/virtual_memory
+Tags: [tlb, translation-lookaside-buffer, address-translation, cache]
+Dependencies: [virtual_memory, page_table]
+Related Skills: [cache/cache]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`page_table` 說明了完整走訪多層 page table 查一次位址轉換,代價是多次額外記憶體存取——如果每一個 `lw`/`sw` 都要付出這個代價，虛擬記憶體帶來的效能損失會大到不可接受。TLB（Translation Lookaside Buffer）就是解決這個問題的硬體：一塊專門快取「最近查過的虛擬到實體位址轉換結果」的小型高速記憶體。
+
+---
+
+# Concepts
+
+- **TLB**：本質上是一個小型、高度平行化查詢的 cache（見 `cache/cache`），存放的不是一般資料，而是「Virtual Page Number → Physical Frame Number」這個對應關係。
+- **TLB Hit**：要轉換的虛擬分頁編號剛好在 TLB 裡，直接拿到實體頁框編號，完全不需要走訪 page table。
+- **TLB Miss**：TLB 裡沒有，必須走訪 page table（可能好幾層）找到答案，找到後**同時**把這筆結果存進 TLB，供之後使用。
+
+---
+
+# Theory
+
+## 為什麼 TLB 可以用「cache 的邏輯」理解，且通常命中率極高
+
+TLB 之所以有效，根源仍然是 `cache/locality`：程式執行時，短時間內存取的位址高度集中在少數幾個分頁（一個 4KB 分頁可以涵蓋大量連續的資料，符合空間區域性；迴圈反覆存取同一個分頁，符合時間區域性）。也因此 TLB 通常只需要很小的容量（例如幾十到幾百個 entry）就能達到很高的命中率（常見設計下可達 99% 以上）——這跟一般資料 cache 的區域性論證完全相同,是同一套原理應用在「位址轉換結果」這種特殊資料上的具體案例。
+
+## TLB Miss 不等於 Page Fault
+
+這是兩個必須嚴格區分的不同事件：TLB Miss 只代表「這筆轉換不在 TLB 裡」，走訪 page table 之後很可能**仍然找得到**有效的轉換（page table 裡 valid bit 是 1）——只是要多花一點時間查表，資料本身沒有問題。只有當走訪 page table 之後發現對應的 valid bit 也是 0，才會真正觸發 Page Fault（見 `page_table`），需要作業系統介入從硬碟載入。TLB Miss 遠比 Page Fault 常發生，代價也遠比 Page Fault 小（TLB Miss 大約是額外幾次記憶體存取，Page Fault 可能涉及硬碟存取，慢上好幾個數量級）。
+
+## Context Switch 對 TLB 的影響
+
+TLB 裡存的轉換結果，是**針對特定 process 的 page table**才有效的——不同 process 的同一個虛擬位址（見 `virtual_memory` skill 的範例），對應到完全不同的實體位址。當作業系統切換到另一個 process（context switch）時，如果不做任何處理，TLB 裡舊 process 的轉換結果對新 process 而言是完全錯誤的資料。常見對策：整個清空 TLB（簡單但每次 context switch 後有一段時間命中率驟降）,或用 **address space ID** 標記每筆 TLB entry 屬於哪個 process（不需清空，但硬體設計更複雜）。
+
+---
+
+# Hardware
+
+TLB 查詢流程（融入完整位址轉換）：
+```
+虛擬位址 --> Virtual Page Number
+                |
+                v
+        +----------------+
+        |   查詢 TLB      |
+        +----------------+
+           |          |
+          Hit        Miss
+           |          |
+           v          v
+   直接取得        走訪 Page Table
+   Physical         （可能多層，見 page_table）
+   Frame Number      |
+           |          v
+           |     取得 Physical Frame Number
+           |          |
+           |          v
+           |     寫入 TLB（供下次查詢命中）
+           |          |
+           +----+-----+
+                v
+   Physical Address = Physical Frame Number ++ Offset
+```
+
+---
+
+# Software
+
+TLB 通常設計成 fully-associative 或高度 associative（見 `cache/cache` 的 associativity 討論），因為 TLB 容量小、entry 數少，即使每次查詢都要跟所有 entry 比對，硬體成本仍然可控，且能最大程度避免 conflict miss（TLB 的命中率極度關鍵，多一次 miss 就要付出走訪 page table 的完整代價）。
+
+---
+
+# Example
+
+一段迴圈反覆存取同一個陣列（符合 `locality`）：第一次存取某個分頁時 TLB miss，走訪 page table 找到轉換並存進 TLB；只要迴圈接下來存取的位址仍在同一個（或少數幾個）分頁內，後續存取全部 TLB hit，完全不需要再碰 page table——這是 TLB 高命中率的典型情境，也是為什麼「循序存取」不只對資料 cache 友善，對 TLB 也同樣友善。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「TLB miss 就代表分頁不在記憶體裡，需要作業系統介入」，這個直覺把 TLB miss 跟 Page Fault 搞混了——TLB miss 只代表「這筆轉換不在 TLB 這個小快取裡」，走訪 page table 通常就能直接找到答案（因為分頁本身多半確實在實體記憶體中），完全不需要作業系統介入；只有 page table 裡的 valid bit 也是 0，才是真正的 Page Fault。這兩者的代價差距可能高達好幾個數量級（TLB miss 是額外幾次記憶體存取，Page Fault 可能涉及硬碟 I/O），混為一談會嚴重誤判效能瓶頸的根源，可以透過分別量測 TLB miss rate 與 page fault rate 驗證兩者是完全不同的統計量。
+- 忽略 context switch 對 TLB 命中率的衝擊，誤以為 TLB 的命中率只跟程式自身的存取模式有關——頻繁的 context switch（例如系統上同時執行大量 process）即使每個 process 自身高度符合區域性，仍可能因為 TLB 被清空或大量 entry 屬於別的 process 而導致命中率下降。
+
+---
+
+# Interview Questions
+
+- 為什麼 TLB miss 跟 Page Fault 是完全不同、代價數量級也不同的兩件事？
+- 為什麼 TLB 通常設計成高度 associative（甚至 fully-associative），而一般資料 cache 常用較低的 associativity（例如 4-way、8-way）？
+
+延伸思考：如果一個系統的 TLB miss rate 突然升高，可能是程式的存取模式改變了、還是系統的排程行為改變了（例如 context switch 變頻繁）？該怎麼透過量測區分這兩種可能原因？
+
+---
+
+# Summary
+
+TLB 是快取「虛擬到實體位址轉換結果」的小型高速 cache，依區域性原理通常能達到極高命中率；TLB Miss 只代表要多走訪一次 page table，跟真正代表分頁不在實體記憶體中的 Page Fault 是完全不同、代價數量級也不同的兩件事；Context switch 會讓 TLB 中舊 process 的轉換結果失效，需要清空 TLB 或用 address space ID 區分。

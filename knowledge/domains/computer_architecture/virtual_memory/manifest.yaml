@@ -1,0 +1,16 @@
+virtual_memory:
+  requires: []
+  optional: []
+  # cross-folder: cache/memory_hierarchy, foundations/c_memory_layout
+
+page_table:
+  requires:
+    - virtual_memory
+  optional: []
+
+tlb:
+  requires:
+    - virtual_memory
+    - page_table
+  optional: []
+  # cross-folder: cache/cache (TLB is itself a small cache)
