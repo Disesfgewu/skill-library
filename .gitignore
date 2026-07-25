@@ -1,0 +1,4 @@
+.agent-artifacts/
+.agent-eye/
+__pycache__/
+*.pyc
