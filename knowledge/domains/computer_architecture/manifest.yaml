@@ -17,12 +17,17 @@ subdomains:
     status: built
 
   isa:
-    covers: [risc-v-instructions, instruction-formats, risc-vs-cisc]
-    status: planned
+    covers:
+      - risc_v_instructions
+      - instruction_formats
+      - risc_vs_cisc
+    status: built
 
   assembly:
-    covers: [risc-v-assembly, calling-convention]
-    status: planned
+    covers:
+      - risc_v_assembly
+      - calling_convention
+    status: built
 
   logic:
     covers:
@@ -50,30 +55,55 @@ subdomains:
     status: built
 
   cache:
-    covers: [locality, memory-hierarchy, cache-structure, miss-rate]
-    status: planned
+    covers:
+      - locality
+      - memory_hierarchy
+      - cache
+    status: built
 
   virtual_memory:
-    covers: [page-table, tlb]
-    status: planned
+    covers:
+      - virtual_memory
+      - page_table
+      - tlb
+    status: built
 
   performance:
-    covers: [cpi, speedup]
-    status: planned
+    covers:
+      - cpi
+      - speedup
+      - amdahls_law
+    status: built
 
   parallel:
-    covers: [multithreading, synchronization, cache-coherency, memory-model]
-    status: planned
+    covers:
+      - multithreading
+      - synchronization
+      - cache_coherency
+      - memory_model
+    status: built
 
   linux:
-    covers: [io-devices, polling, interrupts, trap-handling]
-    status: planned
+    covers:
+      - io_devices
+      - interrupts
+      - trap_handling
+    status: built
+    # scope note: CA course's "Linux Interaction" unit = hardware/OS interface
+    # (I/O, interrupts, traps). NOT the full Linux kernel -- that's the
+    # separate, still-planned top-level domains/linux/ (see ../../router.skill).
 
   practice:
-    covers: [interview-question-sets, worked-problems]
-    status: planned
+    covers:
+      - interview_question_bank
+      - worked_problems
+    status: built
+    # not new concepts -- cross-references/compiles the other 11 sub-domains
+    # into self-test material.
 
-# Cross-subdomain note: pipeline/manifest.yaml lists datapath/single_cycle_datapath
-# as a conceptual dependency (pipeline is single_cycle_datapath split into
-# overlapping stages). datapath/ is now built, so this is a real cross-folder
-# reference rather than a forward reference to a "planned" folder.
+# All 12 sub-domains are now built (40 topic skills total). Cross-folder
+# dependencies between sub-domains (e.g. pipeline/manifest.yaml ->
+# datapath/single_cycle_datapath, virtual_memory -> cache, parallel ->
+# performance/amdahls_law, linux -> virtual_memory/page_table) are noted
+# inline in each affected topic skill/manifest rather than tracked centrally
+# here -- there is no cross-sub-domain forward reference left unresolved.

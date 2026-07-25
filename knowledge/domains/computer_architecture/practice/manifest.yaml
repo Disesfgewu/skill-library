@@ -1,0 +1,11 @@
+interview_question_bank:
+  requires: []
+  optional: []
+  # aggregates/cross-references questions already embedded in each topic
+  # skill's "Interview Questions" section across all built sub-domains
+
+worked_problems:
+  requires: []
+  optional: []
+  # each problem cites which topic skill(s) it draws on; load those on demand
+  # per shared/reasoning.skill's "no skipped steps" requirement

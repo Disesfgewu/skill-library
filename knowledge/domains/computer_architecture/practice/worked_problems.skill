@@ -1,0 +1,150 @@
+# Metadata
+
+Name: worked_problems
+Category: computer_architecture/practice
+Tags: [worked-problems, calculation, self-test]
+Dependencies: []
+Related Skills: [interview_question_bank]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+`interview_question_bank` 測驗概念理解，這個 skill 測驗**計算能力**——`shared/reasoning.skill` 規定所有計算不得跳步，這裡提供幾道完整示範「公式 → 代入 → 化簡 → 結果」全過程的題目，可以直接當作自我測驗的標準答案格式參考，也可以蓋住 Solution 自己先算一次再對照。
+
+---
+
+# Concepts
+
+每道題標明依賴哪個 Topic Skill 的公式/概念，解題前應先確認自己記得該 skill 的核心公式，而不是直接跳到本 skill 抄公式。
+
+---
+
+# Theory
+
+（本 skill 是計算練習彙整，理論說明見各題目依賴的 Topic Skill）
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+（不適用）
+
+---
+
+# Example
+
+## 題目 1：CPI 與執行時間比較（依賴 `performance/cpi`）
+
+**題目**：處理器 X 執行某程式，指令組合為：60% 算術指令（CPI=1）、25% load/store（CPI=4）、15% 分支指令（CPI=2）。若時脈頻率 2.5 GHz，程式共執行 2000 條指令，總執行時間是多少？
+
+**Solution**（逐步展開，不跳步）：
+```
+1. 先算平均 CPI：
+   CPI = 0.60×1 + 0.25×4 + 0.15×2
+       = 0.60 + 1.00 + 0.30
+       = 1.90
+
+2. 代入 CPU Time = Instruction Count × CPI / Clock Rate：
+   CPU Time = 2000 × 1.90 / (2.5×10^9)
+            = 3800 / (2.5×10^9)
+            = 1.52×10^-6 秒
+            = 1.52 微秒 (μs)
+```
+
+---
+
+## 題目 2：AMAT 計算（依賴 `cache/memory_hierarchy`）
+
+**題目**：一個 cache 系統，Hit Time = 2 cycles，Miss Rate = 8%，Miss Penalty = 60 cycles。求 AMAT。若把 Miss Rate 降到 4%（但 Hit Time 因此增加到 3 cycles，因為需要更複雜的比對邏輯），AMAT 會變得更好還是更差？
+
+**Solution**：
+```
+原始設計：
+  AMAT = Hit Time + Miss Rate × Miss Penalty
+       = 2 + 0.08 × 60
+       = 2 + 4.8
+       = 6.8 cycles
+
+新設計：
+  AMAT = 3 + 0.04 × 60
+       = 3 + 2.4
+       = 5.4 cycles
+
+比較：5.4 < 6.8，新設計 AMAT 更低（更好）——
+即使 Hit Time 上升了 1 cycle，Miss Rate 減半帶來的節省（4.8 -> 2.4，省下 2.4 cycles）
+超過了 Hit Time 增加的代價（1 cycle），兩者必須代入公式一起比較，不能只看其中一項。
+```
+
+---
+
+## 題目 3：Amdahl's Law（依賴 `performance/amdahls_law`）
+
+**題目**：一個程式 40% 的執行時間花在可平行化的部分。若用 8 核心平行處理這部分（理想情況下加速 8 倍），整體加速比是多少？若改用無限多核心呢？
+
+**Solution**：
+```
+用 8 核心（Fraction_enhanced = 0.4, Speedup_enhanced = 8）：
+  Overall Speedup = 1 / [ (1 - 0.4) + (0.4 / 8) ]
+                  = 1 / [ 0.6 + 0.05 ]
+                  = 1 / 0.65
+                  ≈ 1.538
+
+用無限多核心（Speedup_enhanced -> ∞，因此 0.4/Speedup_enhanced -> 0）：
+  Overall Speedup -> 1 / (1 - 0.4)
+                   = 1 / 0.6
+                   ≈ 1.667
+
+結論：即使用無限多核心，整體加速比也不會超過約 1.667 倍——
+因為佔 60% 的序列部分完全沒被加速，這是整體加速比的硬性天花板。
+```
+
+---
+
+## 題目 4：Pipeline Misprediction Penalty（依賴 `pipeline/speculation`、`pipeline/branch_prediction`）
+
+**題目**：一個 5-stage pipeline，分支在 EX 階段（第 3 個 stage）才確定結果。若分支預測錯誤發生的機率是 20%，且程式中 15% 的指令是分支指令，平均每條指令因為分支預測錯誤額外付出多少週期的 stall？
+
+**Solution**：
+```
+1. 先算每次預測錯誤的代價（misprediction penalty）：
+   分支在第 3 個 stage（EX）確定結果，代表分支之後已經進入 IF、ID 兩個 stage 的指令
+   （共 2 條）需要被清空 -> misprediction penalty = 2 cycles
+
+2. 算「每條分支指令」平均付出的代價：
+   每條分支指令，有 20% 機率預測錯誤，錯誤時付出 2 cycles：
+   分支指令平均代價 = 0.20 × 2 = 0.4 cycles
+
+3. 算「每條指令」（不只分支指令）平均付出的代價：
+   分支指令佔全部指令的 15%：
+   每條指令平均代價 = 0.15 × 0.4 = 0.06 cycles
+
+結論：平均每條指令因分支預測錯誤多付出 0.06 個週期的 stall，
+這個數字會直接疊加進 performance/cpi.skill 的 CPI 計算中。
+```
+
+---
+
+# Common Mistakes
+
+- 直接抄本 skill 的 Solution 公式，卻不理解每個變數的來源（見對應 Topic Skill）——這違反 `shared/jserv_style.skill` 拒絕背答案的核心精神；正確用法是先自己嘗試、卡住時才回頭查對應 Topic Skill 的 Theory 段。
+- 只算出最終數字，跳過中間步驟——即使是對照本 skill 自我檢查，也應該逐行比對自己的推導過程，而非只比對最終答案是否一致（答案一致不代表推導過程也正確，可能是巧合或錯誤互相抵消）。
+
+---
+
+# Interview Questions
+
+（本 skill 本身即為計算練習彙整，不另外提供延伸問題）
+
+---
+
+# Summary
+
+本 skill 提供 4 道完整、逐步展開的計算範例（CPI/執行時間、AMAT、Amdahl's Law、Misprediction Penalty），每題標明依賴的 Topic Skill；正確用法是先自己嘗試完整推導、卡住才查對應 skill 的公式，而非直接抄本 skill 的 Solution；答案一致不代表推導過程正確，應逐行比對。

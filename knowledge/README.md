@@ -16,8 +16,9 @@ The **execution engine** — actually reading a query, deciding a domain via
 `router.skill`, dynamically loading the matching `domains/<domain>/router.skill`,
 resolving `manifest.yaml` dependencies, and loading the resulting topic skills into
 context — is out of scope here. It's being built on the `disesfgewuAgent` /
-`agent-client-template` side. Nothing in `knowledge/` is wired into this repo's
-existing `skillLoader`/`skills.json` FAISS pipeline; treat the two systems as
+`agent-client-template` side (validated: the `pipeline/` proof-of-concept has been
+tested end-to-end against that engine). Nothing in `knowledge/` is wired into this
+repo's existing `skillLoader`/`skills.json` FAISS pipeline; treat the two systems as
 independent until the consuming agent decides to bridge them.
 
 ## Layout
@@ -26,36 +27,61 @@ independent until the consuming agent decides to bridge them.
 knowledge/
 ├── router.skill              # Global Router: classifies a query into one or more Domains
 ├── SKILL_TEMPLATE.md         # Required section structure for every topic .skill file
-├── shared/                   # Cross-domain behavioral skills (teaching style, rigor, etc.)
+├── shared/                   # Cross-domain behavioral skills:
+│   ├── teaching.skill        #   Why -> How -> Example -> Summary structure
+│   ├── reasoning.skill       #   no skipped steps in derivations/calculations
+│   ├── diagram.skill         #   ASCII diagrams for structural/timing concepts
+│   ├── citation.skill        #   mark source category (textbook/spec/manual/paper)
+│   └── jserv_style.skill     #   rigorous, primary-source-grounded teaching persona
 └── domains/
-    └── computer_architecture/
-        ├── router.skill      # Domain Router: classifies a CA query into Topic Skills
-        ├── overview.skill    # Domain scope + source priority
-        ├── manifest.yaml     # Which sub-folders exist and what they cover
-        └── pipeline/         # One fully-built sub-domain (proof of concept)
-            ├── router.skill
-            ├── manifest.yaml
-            └── *.skill       # 8 topic skills
+    └── computer_architecture/    # fully built: 12/12 sub-domains, 40 topic skills
+        ├── router.skill      # Domain Router: classifies a CA query into sub-domains
+        ├── overview.skill    # Domain scope + source priority (cross-checked vs NCKU)
+        ├── manifest.yaml     # sub-domain -> topics -> status map
+        ├── foundations/      # number_representation, floating_point, boolean_algebra,
+        │                     #   c_memory_layout
+        ├── isa/              # risc_v_instructions, instruction_formats, risc_vs_cisc
+        ├── assembly/         # risc_v_assembly, calling_convention
+        ├── logic/            # combinational_logic, synchronous_digital_systems, fsm
+        ├── datapath/         # single_cycle_datapath, control_unit
+        ├── pipeline/         # pipeline_overview, pipeline_register, pipeline_hazard,
+        │                     #   forwarding, stall, bubble, branch_prediction, speculation
+        ├── cache/            # locality, memory_hierarchy, cache
+        ├── virtual_memory/   # virtual_memory, page_table, tlb
+        ├── performance/      # cpi, speedup, amdahls_law
+        ├── parallel/         # multithreading, synchronization, cache_coherency, memory_model
+        ├── linux/            # io_devices, interrupts, trap_handling (CA's "Linux
+        │                     #   Interaction" unit -- HW/OS interface, not full kernel)
+        └── practice/         # interview_question_bank, worked_problems (self-test,
+                              #   not new concepts)
 ```
+
+Each sub-domain folder contains its own `router.skill` + `manifest.yaml` + topic
+`.skill` files, following `SKILL_TEMPLATE.md`.
 
 ## Status
 
-**4 of 12 `computer_architecture` sub-domains are built**: `foundations` (4 topics),
-`logic` (3 topics), `datapath` (2 topics), `pipeline` (8 topics) — 17 topic skills
-total, plus the global router, shared skills, template, and the domain
-router/overview. `pipeline/manifest.yaml`'s cross-folder dependency on
-`datapath/single_cycle_datapath` is now a real reference, not a forward reference to
-a placeholder.
+**`computer_architecture` is fully built**: all 12 sub-domains, 40 topic skills, plus
+the global router, 5 shared skills, template, and domain router/overview. Every
+cross-sub-domain dependency (e.g. `pipeline` → `datapath`, `virtual_memory` → `cache`,
+`parallel` → `performance/amdahls_law`, `linux` → `virtual_memory/page_table`) points
+at a real, built file — none are forward references to a placeholder anymore.
 
-**Not yet built**: the remaining `computer_architecture` sub-domains listed in
-`domains/computer_architecture/manifest.yaml` (`isa`, `assembly`, `cache`,
-`virtual_memory`, `performance`, `parallel`, `linux`, `practice`), and every domain
-besides `computer_architecture` listed in the top-level `router.skill`.
+**Not yet built**: every domain besides `computer_architecture` listed in the
+top-level `router.skill` (`operating_system`, `linux` [the full-kernel domain, distinct
+from `computer_architecture/linux`'s I/O-and-traps scope], `compiler`, `networking`,
+`distributed_system`, `database`, `ai`, `mathematics`).
 
 Content is written as original explanation grounded in NCKU's Computer Architecture
 course structure (see `computer_architecture/overview.skill` for the source list) —
 not copied from any textbook. Where a specific textbook/spec is the authoritative
-source for a claim, it's cited per `shared/citation.skill` rather than quoted at length.
+source for a claim, it's cited per `shared/citation.skill` rather than quoted at
+length. Teaching tone follows `shared/jserv_style.skill`: primary-source grounding,
+proactively-corrected common misconceptions (not just listed), Socratic follow-up
+questions, and quantified claims over intuition — modeled on NYCU's open Computer
+Architecture / Linux Kernel Internals courseware pedagogy (Jim Huang / Jserv), which
+is itself openly licensed specifically to encourage this kind of reuse. This is an
+adopted teaching *methodology*, not a claim of authorship or endorsement.
 
 Follow the same pattern (`router.skill` + `manifest.yaml` + topic `.skill` files,
-using `SKILL_TEMPLATE.md`) to add the next sub-domain or an entirely new domain.
+using `SKILL_TEMPLATE.md`) to add the next domain.

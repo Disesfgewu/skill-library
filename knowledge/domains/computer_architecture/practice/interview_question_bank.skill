@@ -1,0 +1,87 @@
+# Metadata
+
+Name: interview_question_bank
+Category: computer_architecture/practice
+Tags: [interview-questions, self-test, review]
+Dependencies: []
+Related Skills: [worked_problems]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+每個 Topic Skill 本身都內建一段 Interview Questions（外加 `shared/jserv_style.skill` 要求的「延伸思考」），但分散在幾十個檔案裡不便於複習或自我測驗。這個 skill 是一份**依主題彙整的索引**，把已建立的 sub-domain 依課程順序整理成一份可以逐條自我檢驗的問題集——回答不出來，代表對應的 Topic Skill 需要重讀，而不是繼續往下看答案。
+
+---
+
+# Concepts
+
+依 sub-domain 分類的問題索引（完整說明見各自 Topic Skill 的 Interview Questions / 延伸思考段落，此處僅列問題本身）：
+
+**foundations**：為什麼二補數只有一種 0 的表示？為什麼 IEEE 754 用 biased exponent？未初始化的全域變數跟區域變數在「值是否為 0」這件事上為何不同？
+
+**logic**：怎麼判斷一段電路是不是純組合邏輯？Moore 機跟 Mealy 機的輸出時序差異？為什麼時脈週期不能只看正反器延遲？
+
+**datapath**：為什麼單週期設計的時脈週期由最慢的指令決定？為什麼單週期 Control Unit 可以是純組合邏輯，不需要 FSM？
+
+**pipeline**：為什麼 forwarding 解決不了 load-use hazard？為什麼 2-bit predictor 比 1-bit 更抗單次例外？Misprediction penalty 怎麼隨分支確定結果的 stage 而改變？
+
+**isa / assembly**：為什麼 load-store architecture 能簡化 hazard 分析？為什麼 non-leaf function 幾乎一定要保存 `ra`？固定指令長度如何簡化 pipeline 的 IF 階段？
+
+**cache**：為什麼 conflict miss 在容量充足時仍可能發生？AMAT 公式中為什麼不能只看 Miss Rate？
+
+**virtual_memory**：TLB miss 跟 Page Fault 的代價差幾個數量級，為什麼？多層 page table 用什麼代價換取空間節省？
+
+**performance**：為什麼時脈頻率高不能單獨斷定處理器比較快？Amdahl's Law 為什麼說明加速比例往往比加速倍率更重要？
+
+**parallel**：為什麼「系統有 cache coherency」不代表「多執行緒程式沒有 race condition」？Reordering 導致的 bug 跟 race condition 本質上有何不同？
+
+**linux（I/O/trap）**：為什麼中斷不是任何情境下都優於 polling？Pipeline 化處理器為什麼難以支援精確例外？
+
+---
+
+# Theory
+
+自我測驗的正確用法：**先蓋住答案,自己嘗試完整回答（依 `shared/reasoning.skill` 要求，不得跳步），再對照對應 Topic Skill 的 Theory 段驗證**。如果答得出來但講不出「為什麼」（只記得結論），代表尚未真正達到 `shared/jserv_style.skill` 要求的理解深度——記得結論不算通過自我測驗。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+（不適用 — 本 skill 是問題索引，非程式碼參考）
+
+---
+
+# Example
+
+以 `pipeline` 主題的第一題為例，完整的自我測驗流程：
+1. 讀到問題「為什麼 forwarding 解決不了 load-use hazard？」，先不看答案。
+2. 自己嘗試推導：forwarding 能轉送的前提是「結果已經算出來」；load 指令的結果要到哪個 stage 才真正取得？跟緊接在後的指令的 EX 階段時間點比較，看看是否來得及。
+3. 對照 `pipeline/forwarding.skill` 的 Common Mistakes 段落驗證自己的推導是否正確、完整。
+4. 若推導有缺漏（例如漏講「MEM 階段結束才有結果」這個關鍵字），代表需要重讀 `forwarding.skill` 與 `stall.skill`。
+
+---
+
+# Common Mistakes
+
+- 直接跳去看答案，而不先自己嘗試完整推導——這樣的「複習」只是重複閱讀，無法驗證是否真的內化了理解。
+- 只滿足於「答得出結論」，不追問自己是否能講出完整的因果鏈（為什麼 A 導致 B、B 又導致 C）。
+
+---
+
+# Interview Questions
+
+（本 skill 本身即為問題索引，不另外提供延伸問題）
+
+---
+
+# Summary
+
+本 skill 是依 sub-domain 彙整的面試問題索引，正確用法是先自行完整推導（不得跳步）、再對照原 Topic Skill 驗證，而非直接閱讀答案；答得出結論但講不出因果鏈，不算通過自我測驗。

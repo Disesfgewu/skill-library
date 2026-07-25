@@ -1,0 +1,80 @@
+# Metadata
+
+Name: practice-router
+Category: router
+Tags: [router, practice, interview-questions, worked-problems]
+Dependencies: []
+Related Skills: [shared/reasoning, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `practice` 這個 sub-domain 的問題（想要練習題、想要驗證自己對某個主題的理解、準備面試），需要載入哪些 Topic Skills。跟其他 router 不同，這個 sub-domain 的內容本質是**橫向彙整**其他 sub-domain 已有的知識，而不是介紹新概念,所以判斷邏輯也略有不同：不是先展開 `requires` 依賴鏈，而是先判斷「使用者想練習哪個主題」，再回頭載入那個主題本身的 Topic Skill 加上 `practice` 底下對應的練習內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `interview_question_bank` | 依主題彙整的面試問題索引，指向各 Topic Skill 內建的 Interview Questions |
+| `worked_problems` | 幾道完整、逐步展開計算過程的計算題（CPI、Cache、Speedup 等） |
+
+---
+
+# Theory
+
+`practice` sub-domain 存在的理由，直接呼應 `shared/jserv_style.skill` 的核心精神：「理解代表你能自己重新推導」——被動讀完一個主題的說明，不等於真的掌握了它，唯有能在沒有答案的情況下自己解題、自己回答面試等級的問題，才算驗證了理解。這個 sub-domain 不產生新知識，而是把已建立的知識轉換成「可以自我測驗」的形式。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 若問題是「給我某主題的練習題/面試題」，載入 `interview_question_bank`，並依主題名稱找出對應 sub-domain 已有 Topic Skill 內的 Interview Questions 段落。
+2. 若問題是「幫我算一道 XX 題目」或「出一題 XX 計算題」，載入 `worked_problems`，其中列出的每道題都已標明依賴哪些 Topic Skill，依 `shared/reasoning.skill` 要求載入後逐步展開解題過程。
+3. 若使用者要求的主題目前對應的 sub-domain 仍是 planned（尚未建立），誠實告知目前題庫尚未涵蓋該主題，而非勉強編題。
+
+---
+
+# Example
+
+```
+問題：幫我出幾題 pipeline 面試題？
+直接對應: interview_question_bank
+額外查找: domains/computer_architecture/pipeline/*.skill 各自的 Interview Questions 段落
+```
+
+```
+問題：幫我出一題 cache miss rate 的計算題並完整算給我看
+直接對應: worked_problems
+額外載入: cache/cache, cache/memory_hierarchy（該題依賴的 Topic Skill）
+```
+
+---
+
+# Common Mistakes
+
+- 出練習題時只給答案，沒有依 `shared/reasoning.skill` 要求逐步展開解題過程——`practice` sub-domain 的價值正是示範完整推導,直接給答案違背這個 sub-domain 存在的目的。
+- 對還沒建立的 sub-domain（例如 `isa` 若尚未建置時）勉強編出練習題，而非誠實告知題庫缺口。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`practice` router 不是判斷「該學哪個新概念」，而是判斷「該用哪個已學過的主題來練習」；`interview_question_bank` 彙整各 Topic Skill 已內建的面試問題，`worked_problems` 提供完整逐步展開的計算範例，兩者都是驗證理解、而非傳授新知識的工具。

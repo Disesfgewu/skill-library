@@ -43,7 +43,7 @@ Difficulty: n/a
 
 | Domain | 資料夾 | 狀態 |
 | --- | --- | --- |
-| Computer Architecture | `domains/computer_architecture/` | 已建立（`pipeline/` 子領域已完整，其餘子領域待建） |
+| Computer Architecture | `domains/computer_architecture/` | 已完整建立（12/12 子領域，40 個 Topic Skill） |
 | Operating System | `domains/operating_system/` | 尚未建立 |
 | Linux | `domains/linux/` | 尚未建立 |
 | Compiler | `domains/compiler/` | 尚未建立 |
@@ -88,9 +88,17 @@ Load: domains/linux/router.skill (尚未建立), domains/operating_system/router
 問題：Cache 一致性協定跟多執行緒同步的關係？
 Domain: Computer Architecture
 Load: domains/computer_architecture/router.skill
-（註：cache coherency / multithreading synchronization 屬於 CA 課程範圍內，見
-domains/computer_architecture/overview.skill 的 Linux Interaction 之外，但目前
-computer_architecture/ 底下對應子領域尚未建立，Domain Router 應如實告知。）
+（cache coherency 屬於 computer_architecture/parallel/cache_coherency.skill，
+multithreading synchronization 屬於 computer_architecture/parallel/synchronization.skill，
+兩者皆已建立，由 Domain Router 進一步展開。）
+```
+
+```
+問題：Linux 的 CFS 排程器怎麼運作？
+Domain: Linux
+Load: domains/linux/router.skill (尚未建立)
+（注意：這題問的是完整 Linux 核心的排程子系統，屬於獨立、尚未建立的頂層 linux domain，
+不是 computer_architecture/linux/ 那個範圍限定在 I/O/中斷/trap 的子領域。）
 ```
 
 ---
