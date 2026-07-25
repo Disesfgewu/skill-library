@@ -14,12 +14,7 @@ tags:
 
 # Web Application Testing
 
-To test local web applications, write native Python Playwright scripts.
-
-**Helper Scripts Available**:
-- `scripts/with_server.py` - Manages server lifecycle (supports multiple servers)
-
-**Always run scripts with `--help` first** to see usage. DO NOT read the source until you try running the script first and find that a customized solution is abslutely necessary. These scripts can be very large and thus pollute your context window. They exist to be called directly as black-box scripts rather than ingested into your context window.
+To test local web applications, write native Python Playwright scripts. No bundled helper scripts ship with this skill — write the server-lifecycle glue and the Playwright logic yourself (below) rather than relying on an external script.
 
 ## Decision Tree: Choosing Your Approach
 
@@ -30,8 +25,8 @@ User task → Is it static HTML?
     │         └─ Fails/Incomplete → Treat as dynamic (below)
     │
     └─ No (dynamic webapp) → Is the server already running?
-        ├─ No → Run: python scripts/with_server.py --help
-        │        Then use the helper + write simplified Playwright script
+        ├─ No → Start the dev/prod server yourself (see below), wait for its
+        │        port to accept connections, then run a simplified Playwright script
         │
         └─ Yes → Reconnaissance-then-action:
             1. Navigate and wait for networkidle
@@ -40,24 +35,35 @@ User task → Is it static HTML?
             4. Execute actions with discovered selectors
 ```
 
-## Example: Using with_server.py
+## Managing the server lifecycle yourself
 
-To start a server, run `--help` first, then use the helper:
+When the target app isn't already running, start it as a background subprocess, poll the port until it accepts connections, run the Playwright automation, then terminate the subprocess — don't leave orphaned dev servers running:
 
-**Single server:**
-```bash
-python scripts/with_server.py --server "npm run dev" --port 5173 -- python your_automation.py
+```python
+import socket, subprocess, time
+
+def wait_for_port(port, host="localhost", timeout=30):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with socket.create_connection((host, port), timeout=1):
+                return True
+        except OSError:
+            time.sleep(0.5)
+    raise TimeoutError(f"port {port} did not open within {timeout}s")
+
+server = subprocess.Popen("npm run dev", shell=True)
+try:
+    wait_for_port(5173)
+    # ... run your Playwright automation against http://localhost:5173 ...
+finally:
+    server.terminate()
+    server.wait(timeout=10)
 ```
 
-**Multiple servers (e.g., backend + frontend):**
-```bash
-python scripts/with_server.py \
-  --server "cd backend && python server.py" --port 3000 \
-  --server "cd frontend && npm run dev" --port 5173 \
-  -- python your_automation.py
-```
+For multiple servers (e.g. backend + frontend), start each `subprocess.Popen`, `wait_for_port` on each, then terminate both in `finally`.
 
-To create an automation script, include only Playwright logic (servers are managed automatically):
+To create an automation script, include only Playwright logic once the server is confirmed up:
 ```python
 from playwright.sync_api import sync_playwright
 
@@ -90,15 +96,10 @@ with sync_playwright() as p:
 
 ## Best Practices
 
-- **Use bundled scripts as black boxes** - To accomplish a task, consider whether one of the scripts available in `scripts/` can help. These scripts handle common, complex workflows reliably without cluttering the context window. Use `--help` to see usage, then invoke directly. 
 - Use `sync_playwright()` for synchronous scripts
-- Always close the browser when done
+- Always close the browser (and terminate any subprocess server you started) when done
 - Use descriptive selectors: `text=`, `role=`, CSS selectors, or IDs
 - Add appropriate waits: `page.wait_for_selector()` or `page.wait_for_timeout()`
-
-## Reference Files
-
-- **examples/** - Examples showing common patterns:
-  - `element_discovery.py` - Discovering buttons, links, and inputs on a page
-  - `static_html_automation.py` - Using file:// URLs for local HTML
-  - `console_logging.py` - Capturing console logs during automation
+- For element discovery, use `page.locator(...).all()` combined with a screenshot and `page.content()` rather than guessing selectors blind
+- For static HTML, `page.goto('file:///absolute/path/to/file.html')` works without a server
+- To capture console logs, register a listener before navigating: `page.on("console", lambda msg: print(msg.type, msg.text))`

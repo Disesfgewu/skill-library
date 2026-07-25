@@ -111,29 +111,21 @@ This is **VERY IMPORTANT**: The reference must be so refined that it enhances th
 
 With the philosophy AND conceptual framework established, express it through code. Pause to gather thoughts before proceeding. Use only the algorithmic philosophy created and the instructions below.
 
-### ⚠️ STEP 0: READ THE TEMPLATE FIRST ⚠️
+### VIEWER STRUCTURE
 
-**CRITICAL: BEFORE writing any HTML:**
+This skill ships no bundled HTML template — build the single-file viewer from scratch each time, following this fixed/variable split so every piece stays consistent:
 
-1. **Read** `templates/viewer.html` using the Read tool
-2. **Study** the exact structure, styling, and Anthropic branding
-3. **Use that file as the LITERAL STARTING POINT** - not just inspiration
-4. **Keep all FIXED sections exactly as shown** (header, sidebar structure, Anthropic colors/fonts, seed controls, action buttons)
-5. **Replace only the VARIABLE sections** marked in the file's comments (algorithm, parameters, UI controls for parameters)
+**FIXED (build the same way every time):**
+- Header, sidebar layout, and clean, legible chrome (a consistent light or dark theme with a strong display font for headers and a readable body font)
+- Seed controls in the sidebar (display, Previous/Next, Random, jump-to-seed input)
+- Actions in the sidebar (Regenerate, Reset, Download PNG)
 
-**Avoid:**
-- ❌ Creating HTML from scratch
-- ❌ Inventing custom styling or color schemes
-- ❌ Using system fonts or dark themes
-- ❌ Changing the sidebar structure
+**VARIABLE (unique to this artwork):**
+- The entire p5.js algorithm (setup/draw/classes)
+- The parameters object and its sidebar controls (sliders, inputs)
+- Color pickers, if the art needs adjustable colors — skip if fixed-color or monochrome
 
-**Follow these practices:**
-- ✅ Copy the template's exact HTML structure
-- ✅ Keep Anthropic branding (Poppins/Lora fonts, light colors, gradient backdrop)
-- ✅ Maintain the sidebar layout (Seed → Parameters → Colors? → Actions)
-- ✅ Replace only the p5.js algorithm and parameter controls
-
-The template is the foundation. Build on it, don't rebuild it.
+Pick one deliberate visual identity for the chrome (not the art itself) and keep it consistent across pieces; don't reinvent it per request.
 
 ---
 
@@ -221,25 +213,21 @@ function draw() {
 
 Output:
 1. **Algorithmic Philosophy** - As markdown or text explaining the generative aesthetic
-2. **Single HTML Artifact** - Self-contained interactive generative art built from `templates/viewer.html` (see STEP 0 and next section)
+2. **Single HTML Artifact** - Self-contained interactive generative art viewer (see "VIEWER STRUCTURE" and next section)
 
-The HTML artifact contains everything: p5.js (from CDN), the algorithm, parameter controls, and UI - all in one file that works immediately in claude.ai artifacts or any browser. Start from the template file, not from scratch.
+The HTML artifact contains everything: p5.js (from CDN), the algorithm, parameter controls, and UI - all in one file that works immediately in any browser.
 
 ---
 
 ## INTERACTIVE ARTIFACT CREATION
 
-**REMINDER: `templates/viewer.html` should have already been read (see STEP 0). Use that file as the starting point.**
-
-To allow exploration of the generative art, create a single, self-contained HTML artifact. Ensure this artifact works immediately in claude.ai or any browser - no setup required. Embed everything inline.
+To allow exploration of the generative art, create a single, self-contained HTML artifact. Ensure this artifact works immediately in a browser - no setup required. Embed everything inline.
 
 ### CRITICAL: WHAT'S FIXED VS VARIABLE
 
-The `templates/viewer.html` file is the foundation. It contains the exact structure and styling needed.
-
-**FIXED (always include exactly as shown):**
+**FIXED (always include, consistent chrome across pieces):**
 - Layout structure (header, sidebar, main canvas area)
-- Anthropic branding (UI colors, fonts, gradients)
+- A consistent UI identity (colors, fonts, gradients) reused across pieces
 - Seed section in sidebar:
   - Seed display
   - Previous/Next buttons
@@ -342,14 +330,13 @@ Add as many control-group divs as there are parameters.
 - Seed controls must work (prev/next/random/jump/display)
 - All parameters must have UI controls
 - Regenerate, Reset, Download buttons must work
-- Keep Anthropic branding (UI styling, not art colors)
+- Keep the sidebar chrome styling consistent across pieces (UI styling, not art colors)
 
 ### USING THE ARTIFACT
 
 The HTML artifact works immediately:
-1. **In claude.ai**: Displayed as an interactive artifact - runs instantly
-2. **As a file**: Save and open in any browser - no server needed
-3. **Sharing**: Send the HTML file - it's completely self-contained
+1. **As a file**: Save and open in any browser - no server needed
+2. **Sharing**: Send the HTML file - it's completely self-contained
 
 ---
 
@@ -378,7 +365,7 @@ Each request is unique. The process involves:
 5. **Build matching UI controls** - Sliders/inputs for those parameters
 
 **The constants**:
-- Anthropic branding (colors, fonts, layout)
+- A consistent UI chrome (colors, fonts, layout) across pieces
 - Seed navigation (always present)
 - Self-contained HTML artifact
 
@@ -394,21 +381,9 @@ To achieve the best results, trust creativity and let the philosophy guide the i
 
 ## RESOURCES
 
-This skill includes helpful templates and documentation:
-
-- **templates/viewer.html**: REQUIRED STARTING POINT for all HTML artifacts.
-  - This is the foundation - contains the exact structure and Anthropic branding
-  - **Keep unchanged**: Layout structure, sidebar organization, Anthropic colors/fonts, seed controls, action buttons
-  - **Replace**: The p5.js algorithm, parameter definitions, and UI controls in Parameters section
-  - The extensive comments in the file mark exactly what to keep vs replace
-
-- **templates/generator_template.js**: Reference for p5.js best practices and code structure principles.
-  - Shows how to organize parameters, use seeded randomness, structure classes
-  - NOT a pattern menu - use these principles to build unique algorithms
-  - Embed algorithms inline in the HTML artifact (don't create separate .js files)
+This skill ships no bundled template files — build the HTML viewer (see "VIEWER STRUCTURE" and "INTERACTIVE ARTIFACT CREATION" above) and the p5.js algorithm from scratch each time, both embedded inline in the single self-contained HTML artifact. Organize the algorithm's code with clear parameter objects, seeded randomness set up front, and classes/functions grouped by responsibility (particles, fields, drawing helpers) — but the concrete structure should come from what the philosophy demands, not a fixed pattern menu.
 
 **Critical reminder**:
-- The **template is the STARTING POINT**, not inspiration
 - The **algorithm is where to create** something unique
-- Don't copy the flow field example - build what the philosophy demands
-- But DO keep the exact UI structure and Anthropic branding from the template
+- Don't reuse the same flow-field example every time - build what the philosophy demands
+- But DO keep the sidebar structure and UI identity consistent across pieces
