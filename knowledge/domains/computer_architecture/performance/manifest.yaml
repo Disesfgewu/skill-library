@@ -1,0 +1,13 @@
+cpi:
+  requires: []
+  optional: []
+
+speedup:
+  requires:
+    - cpi
+  optional: []
+
+amdahls_law:
+  requires:
+    - speedup
+  optional: []

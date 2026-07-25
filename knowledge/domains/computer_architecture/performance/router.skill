@@ -1,0 +1,75 @@
+# Metadata
+
+Name: performance-router
+Category: router
+Tags: [router, performance, cpi, speedup, topic-classification]
+Dependencies: []
+Related Skills: [shared/reasoning, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `performance` 這個 sub-domain 的問題（效能量化：CPI、加速比、Amdahl's Law），需要載入哪些 Topic Skills。本身不回答問題內容。這個 sub-domain 是 `shared/jserv_style.skill`「量化勝過直覺」原則最直接的實踐場域。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `cpi` | Cycles Per Instruction，指令執行時間的基本量化模型 |
+| `speedup` | 兩個設計之間的效能倍率比較 |
+| `amdahls_law` | 只加速部分系統時，整體加速比的理論上限 |
+
+---
+
+# Theory
+
+`cpi` 是最基礎的效能量化單位，`speedup` 建立在能算出 CPI（或執行時間）的基礎上做比較，`amdahls_law` 則是在「已知加速比」的基礎上，回答「只最佳化系統一部分時，整體能得到多少好處」這個更進階的問題——三者是嚴格的計算層次遞進。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `speedup` 展開依賴到 `cpi`；`amdahls_law` 展開依賴到 `speedup`（進而 `cpi`）。
+3. 任何效能計算問題，依 `shared/reasoning.skill` 規則，一律要求列出公式、代入數值、逐步化簡的完整過程，不得只給結論數字。
+
+---
+
+# Example
+
+```
+問題：只加速程式中 30% 的部分、加速 2 倍，整體加速比是多少？
+直接對應: amdahls_law
+Requires 展開: speedup, cpi
+最終載入: cpi, speedup, amdahls_law
+```
+
+---
+
+# Common Mistakes
+
+- 效能問題只給最終數字，沒有展開 `shared/reasoning.skill` 要求的逐步計算過程。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`performance` router 依「CPI 基礎量化 → Speedup 比較 → Amdahl's Law 局部加速上限分析」的層次，判斷效能相關問題該載入的 Topic Skill；所有計算依 `shared/reasoning.skill` 要求逐步展開。

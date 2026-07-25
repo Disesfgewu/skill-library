@@ -1,0 +1,81 @@
+# Metadata
+
+Name: speedup
+Category: computer_architecture/performance
+Tags: [speedup, performance-comparison, benchmarking]
+Dependencies: [cpi]
+Related Skills: [amdahls_law]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`cpi` 提供了計算單一設計執行時間的模型，但效能討論的實際問題通常是「A 設計比 B 設計快多少倍」——這就是 Speedup（加速比），一個看似簡單、但很容易被不精確地計算或引用的指標。
+
+---
+
+# Concepts
+
+- **Speedup（加速比）**：`Speedup = 舊設計的執行時間 / 新設計的執行時間`。Speedup = 2 代表新設計花的時間是舊設計的一半（快兩倍）。
+- **Execution Time Ratio**：與 Speedup 互為倒數，`新設計時間 / 舊設計時間`，代表新設計花了舊設計時間的幾分之幾。
+
+---
+
+# Theory
+
+## Speedup 一定要用「執行時間」定義，不能用「CPI」或「Clock Rate」單獨定義
+
+延續 `cpi` skill 的核心教訓：CPU Time = IC × CPI × Clock Cycle Time 是三個因素的乘積，只有**執行時間**（或它的倒數，例如每秒完成的工作量）才是真正反映整體效能的量。如果只比較 CPI 的改善倍率、或只比較 Clock Rate 的提升倍率，而忽略另外兩個因素可能同時變化，算出來的「加速比」可能完全不代表真實的效能提升——這正是 `cpi` skill Example 中「時脈頻率高但總時間反而更長」現象的直接延伸：如果有人只用 Clock Rate 的比值宣稱「加速了 1.5 倍」，卻沒有考慮 CPI 同時上升，這個宣稱是不精確、甚至可能是誤導的。
+
+## Benchmark 選擇對 Speedup 的影響
+
+Speedup 是針對**特定工作負載（workload）**量測出來的數字，不是設計本身的固有屬性。同一組硬體，執行不同的程式（例如一個是密集運算、一個是密集記憶體存取），測出來的 Speedup 可能差異很大——因為不同程式對 `pipeline`、`cache` 等機制的敏感度不同。因此嚴謹的效能宣稱，必須明確指出「在什麼 benchmark/workload 下」測得的 Speedup，脫離具體工作負載談「這個設計快了 N 倍」本身就是不夠精確的陳述。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+Speedup 計算範例：舊設計執行某程式花 100ms，新設計花 40ms：
+```
+Speedup = 100ms / 40ms = 2.5
+```
+即新設計比舊設計快 2.5 倍。若改用「Execution Time Ratio」表示：`40/100 = 0.4`，代表新設計只花了舊設計 40% 的時間——兩種表示法描述同一件事，換算時要注意別搞混方向（常見錯誤：把 Execution Time Ratio 當成 Speedup 直接引用）。
+
+---
+
+# Example
+
+延續 `cpi` skill 的範例（設計 A：750ns，設計 B：833ns，執行同一段程式）：
+```
+Speedup (A 相對於 B) = 833ns / 750ns ≈ 1.11
+```
+即設計 A 比設計 B 快約 1.11 倍——這個數字必須基於（且只能基於）完整代入 IC × CPI × Clock Cycle Time 算出的**執行時間**才能得出，不能直接拿設計 B 的 Clock Rate（3GHz）除以設計 A 的 Clock Rate（2GHz）算出「1.5 倍」就當作 Speedup（那樣算出的 1.5 倍完全忽略了 CPI 的差異，是錯誤的結論，直接違反了 `cpi` skill 強調的「三個因素互相牽制」）。
+
+---
+
+# Common Mistakes
+
+- 如果你看到「新處理器時脈頻率是舊的 1.5 倍，所以快了 1.5 倍」這種說法，這正是上方 Example 明確反駁過的錯誤推理——時脈頻率的比值**不等於**Speedup，除非能確認 CPI 與 Instruction Count 都沒有變化（實務上幾乎不可能，新架構通常同時改變 CPI）；正確做法永遠是先算出（或量測出）完整的執行時間，再取比值。
+- 引用一個 Speedup 數字卻不說明是在什麼 benchmark 或工作負載下測得的——同一個硬體改良，對不同類型的程式可能有完全不同的 Speedup，脫離工作負載談 Speedup 是不完整的陳述。
+
+---
+
+# Interview Questions
+
+- 為什麼不能直接用兩個設計的時脈頻率比值當作 Speedup？
+- 為什麼同一組硬體升級，在不同的 benchmark 下量到的 Speedup 可能差異很大？
+
+延伸思考：如果一個新設計對「運算密集型」程式 Speedup 是 3 倍，對「記憶體密集型」程式 Speedup 只有 1.1 倍，這個新設計最可能是針對哪個環節做了改善（`pipeline`？`cache`？`logic` 的 clock rate？）？
+
+---
+
+# Summary
+
+Speedup = 舊執行時間 / 新執行時間，必須基於完整的執行時間（而非單獨的 CPI 或 Clock Rate 比值）計算，因為三個因素會互相牽制；Speedup 是針對特定 benchmark/workload 量測出來的數字，不是設計本身固有、放諸四海皆準的屬性，引用時必須說明量測條件。

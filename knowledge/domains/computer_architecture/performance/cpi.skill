@@ -1,0 +1,100 @@
+# Metadata
+
+Name: cpi
+Category: computer_architecture/performance
+Tags: [cpi, performance, execution-time, clock-rate]
+Dependencies: []
+Related Skills: [speedup]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+「這個處理器比較快」是一句沒有任何量化內容的話（違反 `shared/jserv_style.skill` 的量化要求）。CPI（Cycles Per Instruction，每指令週期數）是計算機結構中最基本、把「效能」拆解成可以精確計算的三個獨立因素之一的量化模型，是所有效能比較（`speedup`、`amdahls_law`）的計算基礎。
+
+---
+
+# Concepts
+
+CPU 執行時間的經典拆解（Iron Law of Performance）：
+```
+CPU Time = Instruction Count × CPI × Clock Cycle Time
+```
+或等價地：
+```
+CPU Time = Instruction Count × CPI / Clock Rate
+```
+
+三個獨立因素：
+- **Instruction Count（IC）**：程式總共執行了多少條指令——取決於程式本身、編譯器、ISA 設計（`isa/risc_vs_cisc` 談到的指令複雜度直接影響這個數字）。
+- **CPI（Cycles Per Instruction）**：平均每條指令花幾個時脈週期——取決於微架構設計（`pipeline`、`cache` 的行為都會反映在這裡）。
+- **Clock Cycle Time**：一個時脈週期多長——取決於電路設計、製程（`logic/synchronous_digital_systems` 談到的 critical path）。
+
+---
+
+# Theory
+
+## 為什麼要拆成三個獨立因素，而不是直接量「總執行時間」
+
+直接量測總執行時間當然可以知道「快不快」，但無法知道「為什麼快、為什麼慢、該從哪裡下手改善」。把總時間拆成 IC × CPI × Clock Cycle Time 三個因素，讓工程師可以精確定位問題根源：如果 CPI 偏高，可能是 hazard/stall（見 `pipeline_hazard`、`stall`）或 cache miss（見 `cache`）太多；如果 Clock Cycle Time 偏長，可能是某段組合邏輯的 critical path 太長（見 `logic/synchronous_digital_systems`）；如果 Instruction Count 偏多，可能是編譯器沒有做好最佳化、或 ISA 設計讓同樣的工作需要更多指令。這正是量化模型的價值：把一個籠統的「快慢」問題，拆解成三個可以個別測量、個別最佳化的獨立變數。
+
+## 三個因素互相牽制，不能只看單一個
+
+**這是最常被誤解的地方**：這三個因素不是互相獨立、可以各自最佳化到底的——它們之間常有取捨關係。例如：`pipeline` 設計提高時脈頻率（縮短 Clock Cycle Time）,但引入 hazard 可能讓 CPI 上升（stall 週期）；CISC 用複雜指令降低 Instruction Count，但每條指令的 CPI 通常較高（見 `isa/risc_vs_cisc`）。任何「這個設計改善了效能」的宣稱，都必須說明它對這三個因素**分別**的影響，並確認乘積（總執行時間）確實下降，而不能只看其中一個因素改善就下結論。
+
+---
+
+# Hardware
+
+（不適用 — CPI 是一個效能計算模型，不是特定硬體元件；`pipeline`、`cache`、`logic` 各自描述的硬體行為是這個模型中三個因素背後的具體成因）
+
+---
+
+# Software
+
+實際計算 CPI 的方式（若指令混合不同種類、各自 CPI 不同）：
+```
+CPI = Σ (該類指令的 Instruction Count × 該類指令的 CPI) / 總 Instruction Count
+```
+
+範例：一個程式執行 100 條指令，其中 70 條是算術指令（CPI=1）、20 條是 load/store（CPI=3，因為需要存取記憶體）、10 條是分支指令（CPI=2）：
+```
+CPI = (70×1 + 20×3 + 10×2) / 100
+    = (70 + 60 + 20) / 100
+    = 150 / 100
+    = 1.5
+```
+
+---
+
+# Example
+
+比較兩個設計：設計 A（Clock Rate 2GHz，CPI 1.5）跟設計 B（Clock Rate 3GHz，CPI 2.5），執行同一段程式（Instruction Count 相同，設 IC=1000）：
+```
+設計 A: CPU Time = 1000 × 1.5 / (2×10^9) = 1500 / (2×10^9) = 750 ns
+設計 B: CPU Time = 1000 × 2.5 / (3×10^9) = 2500 / (3×10^9) ≈ 833 ns
+```
+設計 B 時脈頻率比較高（3GHz > 2GHz），但因為 CPI 也高很多，實際總執行時間反而比設計 A 更長——這正是「時脈頻率高不代表比較快」的具體量化證據，不能只看時脈頻率這一個數字下結論。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「時脈頻率越高，處理器一定越快」，這個直覺只看了三個因素中的一個（Clock Cycle Time 的倒數），忽略 CPI 同樣重要——上方 Example 已經用具體數字證明：時脈頻率較高的設計，總執行時間反而可能更長，必須把 CPI 也代入公式一起計算才能下結論，不能只比較時脈頻率。
+- 把 CPI 當成一個處理器的「固定屬性」，忽略 CPI 實際上高度依賴**正在執行的程式**（不同的指令組合、cache 行為、hazard 發生頻率都不同）——同一顆處理器執行不同程式，CPI 可能有很大差異，脫離具體程式談「這顆處理器的 CPI 是多少」是不精確的說法。
+
+---
+
+# Interview Questions
+
+- 為什麼「時脈頻率高」不能單獨拿來斷定一個處理器比較快？
+- 如果一個最佳化讓 Instruction Count 下降，但 CPI 上升，該怎麼判斷這個最佳化整體上是好是壞？
+
+延伸思考：`pipeline` 設計理論上能讓 CPI 趨近 1（每個週期完成一個指令），但 `pipeline_hazard` 描述的 hazard 會讓實際 CPI 高於 1。怎麼用本 skill 的公式，把 `pipeline/stall.skill` 描述的 stall 週期數，轉換成對整體 CPI 的具體影響？
+
+---
+
+# Summary
+
+CPU Time = Instruction Count × CPI × Clock Cycle Time，把「效能」拆解成三個可分別測量、分別歸因、但彼此有取捨關係的獨立因素；任何效能宣稱都必須說明對三者的個別影響並確認乘積確實下降，不能只看單一因素（尤其是常被誤用的時脈頻率）就下結論；CPI 本身依賴具體執行的程式，不是處理器的固定屬性。
