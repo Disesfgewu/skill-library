@@ -1,0 +1,107 @@
+# Metadata
+
+Name: cache
+Category: computer_architecture/cache
+Tags: [cache, direct-mapped, set-associative, replacement-policy, cache-block]
+Dependencies: [locality, memory_hierarchy]
+Related Skills: [pipeline/stall]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`memory_hierarchy` 說明了「為什麼」要有 cache 這一層，這個 skill 說明 cache **具體怎麼實作**：怎麼判斷一個位址在不在 cache 裡、如果 cache 滿了該換掉誰、Miss 發生時 pipeline 會怎樣。
+
+---
+
+# Concepts
+
+- **Cache Block / Cache Line**：cache 搬移資料的最小單位（例如 64 bytes），一次搬移一整塊而不是一個 byte，直接利用空間區域性。
+- **Direct-Mapped Cache**：每個記憶體位址只能對應到 cache 中**唯一**一個位置（用 index 決定）。
+- **Set-Associative Cache（N-way）**：每個位址可以對應到一個 set 裡的 N 個位置中任何一個，介於 direct-mapped（1-way）跟 fully-associative（可放任何位置）之間。
+- **位址切分**：`| Tag | Index | Offset |`——Offset 決定在 block 內的位置，Index 決定放進哪個 set，Tag 用來比對確認命中的是不是真的這個位址。
+- **置換策略（Replacement Policy）**：set-associative 或 fully-associative cache 在需要騰出空間時，決定換掉哪一個現有 block，常見策略：LRU（Least Recently Used，換掉最久沒用的）。
+
+---
+
+# Theory
+
+## 為什麼不用 Fully-Associative（任何位址都能放任何位置）
+
+Fully-associative 理論上命中率最高（因為完全沒有「這個位址只能放這裡，即使那裡是空的」的限制），但代價是：每次查詢都要**同時比對所有位置的 Tag**，硬體上需要跟 cache 大小等量的比較器（comparator），成本隨容量線性增加,大容量下不可行。Direct-mapped 只需要一個比較器（用 Index 直接定位到唯一位置），硬體最簡單、速度最快，但容易發生「兩個常用位址剛好對應到同一個 Index」互相踢掉對方的情況（conflict miss）。Set-associative 是折衷：只需要在一個 set 內（N 個位置）比較，硬體成本可控，同時大幅降低 conflict miss 的機率。
+
+## 三種 Miss 的分類
+
+- **Compulsory Miss（強制性失誤）**：第一次存取某個 block，不管 cache 多大都無法避免（資料還沒被載入過）。
+- **Capacity Miss（容量性失誤）**：cache 容量不夠大，之前載入過的 block 被踢出去，之後又要用時發生 miss——即使是 fully-associative 也無法避免（除非加大容量）。
+- **Conflict Miss（衝突性失誤）**：因為 associativity 不夠高（例如 direct-mapped），多個常用的 block 硬體上只能對應到同一個位置而互相踢掉，即使 cache 還有空間也可能發生——提高 associativity 可以緩解甚至消除這類 miss。
+
+這個分類的實務價值：診斷「這個程式 cache miss rate 為什麼這麼高」時，先判斷是哪一種 miss 主導，才知道該對症下藥（例如 conflict miss 主導 → 提高 associativity 或改變資料佈局；capacity miss 主導 → 加大 cache 容量或改善程式的區域性）。
+
+## Cache Miss 對 Pipeline 的具體影響
+
+Cache miss 發生時，處理器必須等待資料從下一層記憶體階層送回來，這段等待期間 pipeline 必須 stall（見 `pipeline/stall`）——跟 load-use hazard 造成的 stall 是**不同的根源**：load-use hazard 是「資料相依」造成的結構性延遲（固定 1 個週期），cache miss 造成的 stall 週期數等於 `memory_hierarchy` skill 定義的 Miss Penalty，通常遠大於 1 個週期（可能是幾十到幾百個週期），且不是每次執行都固定發生（取決於是否真的 miss）。
+
+---
+
+# Hardware
+
+Direct-mapped cache 的位址切分與查詢流程：
+
+```
+Address: | Tag (t bits) | Index (s bits) | Offset (b bits) |
+
+查詢流程：
+1. 用 Index 直接定位到 cache 中唯一一個 entry
+2. 比較該 entry 存的 Tag 是否等於位址中的 Tag，且 valid bit 為 1
+3. 相符 -> Hit，用 Offset 取出 block 內對應的資料
+4. 不符或 valid=0 -> Miss，向下一層要整個 block，存進這個 entry（連同新 Tag），
+   同時把資料送給處理器
+```
+
+---
+
+# Software
+
+一個簡化的 direct-mapped cache 查詢邏輯（概念示意）：
+```
+index = (address >> offset_bits) & index_mask
+tag   = address >> (offset_bits + index_bits)
+
+若 cache[index].valid 且 cache[index].tag == tag:
+    命中，回傳 cache[index].data[offset]
+否則:
+    向下一層要 address 所在的整個 block
+    cache[index] = {valid: 1, tag: tag, data: 取回的 block}
+    回傳 cache[index].data[offset]
+```
+
+---
+
+# Example
+
+一個 4-way set-associative cache 為什麼比 direct-mapped 更能容忍「常見的存取模式」：假設程式交替存取兩個位址 A、B，兩者剛好對應到同一個 Index。在 direct-mapped 下，每次存取都會把對方踢出去（A 進來踢掉 B，下次存 B 又踢掉 A），變成**每次存取都 miss**，即使 cache 其他位置完全是空的——這是典型的 conflict miss。在 4-way set-associative 下，A、B 可以同時放在同一個 set 的不同 way，兩者都能穩定命中，不會互踢。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「cache 越大，associativity 就不重要了」，這個直覺忽略了 conflict miss 的發生跟「有沒有空位」無關，而是跟「硬體規則允許不允許放在那個空位」有關（見上方 Example）——即使整個 cache 有大量閒置空間，direct-mapped 下兩個位址若對應到同一個 Index，還是會持續互踢，可以用上方 Example 的情境驗證，容量大小在這裡並不能解決問題。
+- 把三種 miss（compulsory/capacity/conflict）混為一談，籠統地說「miss rate 太高，加大 cache 就好」——如果 miss 主要是 conflict miss，加大容量的效果會很有限，真正該做的是提高 associativity 或改善資料佈局；診斷錯誤的 miss 類型會讓最佳化的方向完全用錯力氣。
+- 把 cache miss 造成的 stall 跟 load-use hazard 造成的 stall（見 `pipeline/stall`）當成同一種、代價相同的東西——兩者根源不同、代價數量級也通常差很多（前者可能是幾十到幾百週期，後者固定 1 週期）。
+
+---
+
+# Interview Questions
+
+- 為什麼 conflict miss 在容量充足的 cache 中仍然可能發生？
+- Direct-mapped、Set-associative、Fully-associative 三者在硬體成本與命中率之間，各自的取捨是什麼？
+
+延伸思考：如果一個程式的 miss rate 很高，怎麼透過分析存取模式（而不是直接猜測）判斷主要是哪一種 miss（compulsory / capacity / conflict）主導？
+
+---
+
+# Summary
+
+Cache 用 Tag/Index/Offset 切分位址，direct-mapped（硬體簡單但容易 conflict miss）與 set-associative（用有限比較器數量換取更低 conflict miss 機率）是常見折衷；miss 分 compulsory/capacity/conflict 三類，各自需要不同的最佳化對策；cache miss 造成的 pipeline stall，代價（Miss Penalty）與根源都跟 load-use hazard 造成的 stall 不同，不應混為一談。

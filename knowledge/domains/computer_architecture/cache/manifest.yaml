@@ -1,0 +1,15 @@
+locality:
+  requires: []
+  optional: []
+
+memory_hierarchy:
+  requires:
+    - locality
+  optional: []
+
+cache:
+  requires:
+    - locality
+    - memory_hierarchy
+  optional: []
+  # cross-folder: pipeline/stall (memory-latency-induced structural stalls)

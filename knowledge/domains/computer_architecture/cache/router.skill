@@ -1,0 +1,75 @@
+# Metadata
+
+Name: cache-router
+Category: router
+Tags: [router, cache, memory-hierarchy, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/reasoning, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `cache` 這個 sub-domain 的問題（區域性原理、記憶體階層、cache 本身的結構與行為），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `locality` | 時間/空間區域性原理，cache 存在的理論依據 |
+| `memory_hierarchy` | 為什麼記憶體系統要分多層（暫存器/cache/主記憶體/硬碟） |
+| `cache` | Cache 的具體結構（direct-mapped、set-associative）、hit/miss、置換策略、AMAT 計算 |
+
+---
+
+# Theory
+
+`locality` 是最根本的先備知識：沒有區域性原理，`memory_hierarchy`「用小而快的記憶體擋住大部分存取」這個策略根本不會有效；`memory_hierarchy` 則是 `cache` 存在的架構脈絡——`cache` 只是這個階層中最靠近處理器的其中一層，理解階層的整體邏輯才能理解為什麼 cache 要那樣設計。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `memory_hierarchy` 展開依賴到 `locality`；`cache` 展開依賴到 `locality`、`memory_hierarchy`。
+3. 若問題牽涉「cache miss 對 pipeline 的影響」，屬於跨 sub-domain 問題，需同時載入 `pipeline/stall`——由 `computer_architecture-router` 在更上層判斷。
+
+---
+
+# Example
+
+```
+問題：Direct-mapped cache 跟 set-associative cache 的差別？
+直接對應: cache
+Requires 展開: locality, memory_hierarchy
+最終載入: locality, memory_hierarchy, cache
+```
+
+---
+
+# Common Mistakes
+
+- 把 cache 的存在直接當成「理所當然要有的東西」，跳過 `locality` 這個理論依據，導致無法解釋「為什麼」cache 有效、也無法判斷什麼樣的存取模式下 cache 會失效。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`cache` router 依「區域性原理 → 記憶體階層策略 → cache 具體結構」的層次，判斷 cache 相關問題該載入的 Topic Skill。

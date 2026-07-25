@@ -1,0 +1,110 @@
+# Metadata
+
+Name: memory_hierarchy
+Category: computer_architecture/cache
+Tags: [memory-hierarchy, cache, amat, cost-performance-tradeoff]
+Dependencies: [locality]
+Related Skills: [cache]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+如果只用一種記憶體技術，設計者永遠面臨兩難：又快又大的記憶體造價極高，便宜又大的記憶體速度太慢。記憶體階層（Memory Hierarchy）用 `locality` 描述的區域性原理，把不同速度/容量/成本的記憶體技術疊成多層，讓系統**大部分時候**都感覺像在用最快的那一層,同時整體容量與成本又接近最便宜的那一層。
+
+---
+
+# Concepts
+
+由靠近處理器到遠離處理器，典型階層（速度遞減、容量遞增、單位成本遞減）：
+
+```
+暫存器（Registers）  <- 最快、最貴、容量最小（幾十個）
+    |
+L1 Cache
+    |
+L2 Cache
+    |
+L3 Cache（若有）
+    |
+主記憶體（Main Memory, DRAM）
+    |
+硬碟/SSD（Secondary Storage） <- 最慢、最便宜、容量最大
+```
+
+---
+
+# Theory
+
+## 這個設計為什麼「幾乎白吃午餐」
+
+關鍵在於區域性：`locality` 說明大多數記憶體存取會反覆命中「最近用過」或「附近」的資料，這代表**只要**把最近/附近用過的資料放進小而快的上層記憶體，絕大多數存取（依 90/10 法則的經驗觀察，常見說法是程式 90% 的執行時間花在 10% 的程式碼上）就能被上層擋下，只有少數真正需要「新」資料的存取才需要付出下層的完整延遲。整個系統的**平均**存取時間因此接近上層的速度，但容量與成本卻是下層決定的——這不是真的「白吃午餐」，代價是設計複雜度（需要額外硬體判斷資料在哪一層、需要處理搬移與一致性），但用區域性換取的效益通常遠大於這個複雜度成本。
+
+## AMAT（Average Memory Access Time，平均記憶體存取時間）
+
+量化整個階層效能的核心公式：
+```
+AMAT = Hit Time + Miss Rate × Miss Penalty
+```
+- **Hit Time**：在這一層命中時的存取時間。
+- **Miss Rate**：這一層沒命中（需要往下一層要資料）的比例。
+- **Miss Penalty**：沒命中時，額外付出（去下一層拿資料）的代價。
+
+多層階層時，這個公式可以遞迴展開——上一層的 Miss Penalty，其實就是下一層的 AMAT（因為往下一層要資料，下一層本身也可能 hit 或 miss）。這正是 `shared/jserv_style.skill` 要求量化的具體體現：任何「這個設計比較快」的宣稱，最終都要能代入這個公式算出具體數字。
+
+---
+
+# Hardware
+
+（見 `cache` skill 中 cache 本身的硬體結構；本 skill 談的是階層策略，不是單一層的實作細節）
+
+---
+
+# Software
+
+以一個具體數字驗證 AMAT 公式（單層 cache，示意數值）：
+```
+Hit Time = 1 cycle
+Miss Rate = 5%
+Miss Penalty = 100 cycles
+
+AMAT = 1 + 0.05 × 100 = 1 + 5 = 6 cycles
+```
+即使 miss rate 只有 5%，因為 miss penalty 相對很大（100 倍於 hit time），AMAT 仍然是 hit time 的 6 倍——這說明了為什麼降低 miss rate、或降低 miss penalty，都是有效的最佳化方向，兩者對 AMAT 的影響需要代入具體數字才能比較，不能只憑直覺判斷哪個「聽起來」比較重要。
+
+---
+
+# Example
+
+多層階層的 AMAT 遞迴計算（L1 + L2 兩層，示意數值）：
+```
+L2: Hit Time = 10 cycles, Miss Rate = 20%, Miss Penalty(到主記憶體) = 200 cycles
+    AMAT_L2 = 10 + 0.20 × 200 = 10 + 40 = 50 cycles
+
+L1: Hit Time = 1 cycle, Miss Rate = 5%, Miss Penalty = AMAT_L2 = 50 cycles
+    AMAT_L1 = 1 + 0.05 × 50 = 1 + 2.5 = 3.5 cycles
+```
+整體系統的 AMAT（即 L1 的 AMAT）是 3.5 cycles——遠低於直接存取主記憶體（若無任何 cache）的延遲，這正是多層階層「用區域性換效能」的具體量化效果。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「Miss Rate 越低，系統效能一定越好」，這個直覺忽略了 Miss Penalty 同樣重要——AMAT 公式是兩者的乘積加上 Hit Time，一個 Miss Rate 較低但 Miss Penalty 大很多的設計，AMAT 可能反而比 Miss Rate 較高但 Miss Penalty 小很多的設計更差，必須實際代入公式計算比較，不能只看 Miss Rate 這一個數字（這點在 `shared/jserv_style.skill` 的 Example 中也用同樣的道理示範過）。
+- 忽略多層階層的 AMAT 是遞迴定義——上一層的 Miss Penalty 就是下一層的 AMAT，不是一個獨立、跟下一層設計無關的固定常數；改變 L2 的設計，會連帶改變 L1 的 AMAT。
+
+---
+
+# Interview Questions
+
+- 為什麼 AMAT 公式中，Miss Penalty 通常比 Miss Rate 對整體效能的影響更需要被優先關注（在 Miss Penalty 遠大於 Hit Time 的情況下）？
+- 多層記憶體階層中，上一層的 Miss Penalty 為什麼等於下一層的 AMAT？
+
+延伸思考：如果新增一層 L3 cache，理論上一定能降低整體 AMAT 嗎？在什麼情況下，多加一層反而可能沒有幫助、甚至因為多了一層判斷而增加平均延遲？
+
+---
+
+# Summary
+
+記憶體階層利用區域性原理，把不同速度/容量/成本的記憶體技術疊成多層，讓系統平均存取時間接近最快層、容量與成本接近最便宜層；AMAT = Hit Time + Miss Rate × Miss Penalty 是量化整個階層效能的核心公式，多層階層下 AMAT 是遞迴定義的，任何效能宣稱都應該能代入這個公式算出具體數字，而非僅憑直覺判斷。
