@@ -1,0 +1,92 @@
+# Metadata
+
+Name: single_cycle_datapath
+Category: computer_architecture/datapath
+Tags: [datapath, single-cycle, cpu-design, risc-v]
+Dependencies: []
+Related Skills: [control_unit]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+在談 pipeline（把執行過程重疊）之前，必須先理解「一個指令完整執行一次，需要哪些硬體元件、怎麼連接」——這就是單週期資料路徑（single-cycle datapath）：每個指令都在一個時脈週期內從頭到尾執行完畢，是最直觀、但也最沒有效率的 CPU 設計基準點。
+
+---
+
+# Concepts
+
+單週期 datapath 的核心硬體元件：
+
+- **PC（Program Counter）**：存放目前指令位址的暫存器。
+- **Instruction Memory**：依 PC 讀出指令。
+- **Register File**：暫存器檔，可同時讀兩個來源暫存器、寫一個目的暫存器。
+- **ALU**：算術邏輯運算單元，做加減、邏輯運算、位址計算。
+- **Data Memory**：資料記憶體，load/store 指令存取的對象。
+- **各種 MUX**：依控制訊號選擇資料路徑該走哪一條（例如 ALU 第二個輸入該用暫存器值還是立即值）。
+
+---
+
+# Theory
+
+## 為什麼是「單週期」
+
+單週期設計要求：時脈週期必須長到足以讓**最慢的那一種指令**（通常是 load，因為要經過 Instruction Memory 讀取 → Register File 讀取 → ALU 算位址 → Data Memory 存取 → Register File 寫回，走完整條路徑）完整跑完。這代表即使是簡單的指令（例如加法，不需要存取 Data Memory），也被迫使用跟 load 一樣長的時脈週期——這正是單週期設計效率低落、且是 `pipeline_overview` 提出「重疊執行」動機的直接對照組。
+
+## 不同指令類型共用同一套硬體
+
+R-type（例如 `add`）、I-type（例如 `addi`、`lw`）、S-type（例如 `sw`）、B-type（例如 `beq`）指令雖然行為不同，但都共用同一套 ALU、同一個 Register File——差別在於：控制訊號決定 MUX 該選哪一條路徑（例如 ALU 第二輸入是暫存器值還是立即值）、哪些元件該被致能（例如 load/store 才需要真正存取 Data Memory）。這種「硬體共用、行為由控制訊號區分」的設計方式，正是 `control_unit` 存在的理由。
+
+---
+
+# Hardware
+
+簡化的單週期 datapath 示意（以 R-type 與 load 指令共用路徑為例）：
+
+```
+        +--------+     +-----------+      +-----+      +--------+
+PC ---->| Instr  |---->| Register  |----->| ALU |----->|  Data  |
+        | Memory |  |  |   File    |  |   +-----+  |   | Memory |
+        +--------+  |  +-----------+  |      ^      |   +--------+
+                     |        ^        |      |      |        |
+                     |        |     [MUX]<--Imm      |        v
+                     |        |    (reg/imm)         |   [MUX]---> 寫回
+                     |        +----------------------+   (mem/alu)  Register File
+                     |                                        |
+                     +----------------------------------------+
+```
+
+Register File 的讀取路徑同時餵給 ALU（做運算）；ALU 第二輸入透過 MUX 在「暫存器值」與「立即值（Imm）」間選擇（區分 R-type 跟 I-type）；最終寫回 Register File 的值透過另一個 MUX 在「ALU 結果」與「Data Memory 讀出值」間選擇（區分一般運算指令跟 load 指令）。
+
+---
+
+# Software
+
+從指令格式（RISC-V 的 R/I/S/B/U/J type）解碼出的欄位（opcode、funct3、funct7、rs1、rs2、rd、immediate），直接對應到上方 Hardware 圖中各個訊號要接去哪裡——這也是為什麼理解 ISA 的指令格式（屬於 `isa` sub-domain）是看懂 datapath 圖的前提之一。
+
+---
+
+# Example
+
+執行 `add x1, x2, x3`（R-type）：PC 送位址到 Instruction Memory 取出指令 → 解碼出 rs1=x2, rs2=x3, rd=x1 → Register File 讀出 x2、x3 的值 → MUX 選擇「暫存器值」送進 ALU 第二輸入（因為是 R-type，不是立即值）→ ALU 做加法 → 寫回 MUX 選擇「ALU 結果」（不是記憶體讀值，因為不是 load）→ 寫回 Register File 的 x1。整個過程在一個時脈週期內完成。
+
+---
+
+# Common Mistakes
+
+- 以為 load 指令跟 R-type 指令走的是「不同的硬體」——實際上是同一套硬體，只是控制訊號讓不同的 MUX 選擇不同路徑、不同的致能訊號決定 Data Memory 是否真的參與這次執行。
+- 忽略單週期設計的時脈週期長度是被「最慢的指令」決定，而非每種指令各自有各自的週期長度。
+
+---
+
+# Interview Questions
+
+- 為什麼單週期設計中，即使是簡單的 R-type 指令，時脈週期也要跟最慢的 load 指令一樣長？
+- Store 指令（`sw`）跟 Load 指令（`lw`）在單週期 datapath 中，哪些硬體路徑是共用的、哪些是不同的？
+
+---
+
+# Summary
+
+單週期 datapath 讓每個指令用同一套硬體（Instruction Memory、Register File、ALU、Data Memory）在一個時脈週期內完整執行，不同指令類型靠控制訊號驅動的 MUX 選擇不同資料路徑；時脈週期被最慢的指令（通常是 load）決定，是這種設計效率低落、進而催生 pipeline 設計的直接原因。

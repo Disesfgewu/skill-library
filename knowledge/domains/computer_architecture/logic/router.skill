@@ -1,0 +1,75 @@
+# Metadata
+
+Name: logic-router
+Category: router
+Tags: [router, digital-logic, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/diagram]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `logic` 這個 sub-domain 的問題（組合邏輯、同步數位系統、有限狀態機），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `combinational_logic` | 純組合邏輯電路：MUX、Decoder、Adder 等常見元件 |
+| `synchronous_digital_systems` | 時脈、正反器、暫存器，狀態如何在時脈邊緣更新 |
+| `fsm` | 有限狀態機：狀態、轉移條件、Moore/Mealy 機 |
+
+---
+
+# Theory
+
+這三者是嚴格的先備關係：組合邏輯是最基本的building block（沒有記憶性，輸出只取決於當下輸入）；同步數位系統在組合邏輯之外加入「記憶」（正反器記住上一個週期的狀態）；FSM 則是「用同步數位系統的記憶特性 + 組合邏輯的轉移/輸出邏輯」組成的抽象模型，是後面 `datapath` sub-domain 中 Control Unit 設計的直接理論基礎。
+
+---
+
+# Hardware
+
+（不適用 — 見各 Topic Skill）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `fsm` 展開依賴到 `synchronous_digital_systems`、`combinational_logic`；`synchronous_digital_systems` 展開到 `combinational_logic`。
+3. 若問題其實在問 pipeline register 或 control unit（跨 sub-domain），判斷歸屬 `pipeline`/`datapath`，`logic` 的內容作為它們的先備知識由對方 manifest 處理。
+
+---
+
+# Example
+
+```
+問題：Moore 機跟 Mealy 機的差別？
+直接對應: fsm
+Requires 展開: synchronous_digital_systems, combinational_logic
+最終載入: combinational_logic, synchronous_digital_systems, fsm
+```
+
+---
+
+# Common Mistakes
+
+- 把 `datapath` 的 Control Unit 問題誤判成純粹的 `fsm` 問題而忽略它同時牽涉具體的 CPU 控制訊號設計。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`logic` router 依組合邏輯 → 同步數位系統 → FSM 的先備順序，判斷數位邏輯類問題該載入的 Topic Skill，這條依賴鏈是後面 Control Unit / Pipeline Register 設計的理論基礎。

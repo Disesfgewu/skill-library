@@ -9,8 +9,12 @@
 
 subdomains:
   foundations:
-    covers: [number-representation, floating-point, boolean-algebra, c-memory-layout]
-    status: planned
+    covers:
+      - number_representation
+      - floating_point
+      - boolean_algebra
+      - c_memory_layout
+    status: built
 
   isa:
     covers: [risc-v-instructions, instruction-formats, risc-vs-cisc]
@@ -21,12 +25,17 @@ subdomains:
     status: planned
 
   logic:
-    covers: [synchronous-digital-systems, combinational-logic, fsm]
-    status: planned
+    covers:
+      - combinational_logic
+      - synchronous_digital_systems
+      - fsm
+    status: built
 
   datapath:
-    covers: [single-cycle-datapath, control-unit]
-    status: planned
+    covers:
+      - single_cycle_datapath
+      - control_unit
+    status: built
 
   pipeline:
     covers:
@@ -64,8 +73,7 @@ subdomains:
     covers: [interview-question-sets, worked-problems]
     status: planned
 
-# Cross-subdomain note: pipeline/manifest.yaml lists `datapath` as a required
-# dependency (pipeline execution assumes a working single-cycle datapath as the
-# conceptual baseline). Since datapath/ is still "planned", any topic skill in
-# pipeline/ that references datapath concepts does so inline instead of via a
-# real cross-file load, and flags it as a forward reference.
+# Cross-subdomain note: pipeline/manifest.yaml lists datapath/single_cycle_datapath
+# as a conceptual dependency (pipeline is single_cycle_datapath split into
+# overlapping stages). datapath/ is now built, so this is a real cross-folder
+# reference rather than a forward reference to a "planned" folder.

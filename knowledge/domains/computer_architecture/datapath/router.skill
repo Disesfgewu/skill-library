@@ -1,0 +1,74 @@
+# Metadata
+
+Name: datapath-router
+Category: router
+Tags: [router, datapath, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/diagram]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `datapath` 這個 sub-domain 的問題（單週期 CPU 的資料路徑、控制單元設計），需要載入哪些 Topic Skills。本身不回答問題內容。這個 sub-domain 也是 `pipeline` sub-domain 概念上的先備知識（pipeline 是把這裡的單週期 datapath「切開重疊執行」）。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `single_cycle_datapath` | 單週期 CPU 的完整資料路徑：Instruction Memory、Register File、ALU、Data Memory 如何連接 |
+| `control_unit` | 依指令 opcode 產生控制訊號，決定資料路徑中各個 MUX/致能訊號的行為 |
+
+---
+
+# Theory
+
+`single_cycle_datapath` 是先備知識：必須先知道有哪些硬體元件、怎麼連接，才能理解 `control_unit` 要控制的是什麼訊號。這兩者合起來，是 `pipeline` sub-domain 的直接基礎——`pipeline_overview` 描述的 5 個 stage，本質上就是把單週期 datapath 依功能切成 5 段、中間插入 pipeline register。
+
+---
+
+# Hardware
+
+（不適用 — 見各 Topic Skill）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `control_unit` 展開依賴到 `single_cycle_datapath`。
+3. 若問題其實在問 pipeline 版本的 datapath/control（例如「pipeline 裡的 control 訊號怎麼傳遞」），判斷歸屬 `pipeline` sub-domain，`datapath` 的內容作為它的先備知識由 `pipeline/manifest.yaml` 的 forward reference 處理。
+
+---
+
+# Example
+
+```
+問題：單週期 CPU 怎麼從指令的 opcode 決定要不要寫暫存器？
+直接對應: control_unit
+Requires 展開: single_cycle_datapath
+最終載入: single_cycle_datapath, control_unit
+```
+
+---
+
+# Common Mistakes
+
+- 把 pipeline 版本的 datapath 問題誤判成純粹的單週期 `datapath` 問題，忽略 pipeline 額外引入的 pipeline register 與 hazard 處理，兩者資料路徑的細節並不相同。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`datapath` router 判斷單週期資料路徑/控制單元問題該載入的 Topic Skill，`single_cycle_datapath` 是 `control_unit` 的先備知識，兩者合起來也是 `pipeline` sub-domain 的概念基礎。

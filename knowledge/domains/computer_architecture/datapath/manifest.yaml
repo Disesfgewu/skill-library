@@ -1,0 +1,11 @@
+single_cycle_datapath:
+  requires: []
+  optional: []
+  # cross-folder dependency: logic/combinational_logic, logic/synchronous_digital_systems,
+  # foundations/number_representation (referenced inline, not re-loaded as separate files)
+
+control_unit:
+  requires:
+    - single_cycle_datapath
+  optional: []
+  # cross-folder dependency: logic/fsm (referenced inline)

@@ -1,0 +1,15 @@
+combinational_logic:
+  requires: []
+  optional: []
+  # depends conceptually on foundations/boolean_algebra (cross-folder, referenced inline)
+
+synchronous_digital_systems:
+  requires:
+    - combinational_logic
+  optional: []
+
+fsm:
+  requires:
+    - synchronous_digital_systems
+    - combinational_logic
+  optional: []

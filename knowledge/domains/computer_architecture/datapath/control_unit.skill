@@ -1,0 +1,95 @@
+# Metadata
+
+Name: control_unit
+Category: computer_architecture/datapath
+Tags: [control-unit, control-signals, decoder, risc-v]
+Dependencies: [single_cycle_datapath]
+Related Skills: []
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`single_cycle_datapath` 描述了硬體元件怎麼連接、以及各種 MUX 需要控制訊號才能決定資料路徑，但沒有說「這些控制訊號從哪裡來、怎麼決定」。Control Unit 正是負責這件事的元件：讀取指令的 opcode（與部分功能欄位），產生驅動整個 datapath 的所有控制訊號。
+
+---
+
+# Concepts
+
+Control Unit 產生的典型控制訊號（以 RISC-V 為例）：
+
+- **RegWrite**：是否要把結果寫回 Register File。
+- **MemRead / MemWrite**：是否要讀/寫 Data Memory。
+- **ALUSrc**：ALU 第二輸入該用暫存器值還是立即值。
+- **ALUOp**：告訴 ALU 該做哪一種運算（加、減、邏輯運算等，通常搭配 funct3/funct7 進一步細分）。
+- **MemToReg**：寫回 Register File 的值該用 ALU 結果還是 Data Memory 讀出值。
+- **Branch**：是否為分支指令，是否要依 ALU 判斷結果決定下一個 PC。
+
+---
+
+# Theory
+
+## Control Unit 的本質是純組合邏輯（單週期設計中）
+
+在單週期設計裡，Control Unit 本身**不需要記憶性**——它只是一個查表機制：輸入 opcode（+funct3/funct7），輸出一組固定的控制訊號組合，這正是純粹的組合邏輯（`combinational_logic`），可以直接用一張真值表（或等價的 SOP 表示式）實現。這跟多週期（multi-cycle）設計中 Control Unit 必須用 FSM（`fsm`）實現、要記得「現在執行到第幾個週期」有本質上的不同——單週期設計因為每個指令都在同一個週期內走完全部流程，不需要跨週期記住任何執行進度。
+
+## 為什麼要把 Control Unit 獨立出來，而不是把控制邏輯散落在各元件裡
+
+集中設計的好處：新增或修改指令的行為時，只需要修改 Control Unit 這一張表，不必去動 ALU、Register File 等元件本身的設計——這是關注點分離（separation of concerns）在硬體設計上的具體體現：資料路徑負責「怎麼算」，Control Unit 負責「該不該算、算完的結果該往哪裡送」。
+
+---
+
+# Hardware
+
+```
+                +----------------+
+   Opcode ----->|                |----> RegWrite
+   funct3  ----->|  Control Unit  |----> MemRead
+   funct7  ----->|  (組合邏輯)     |----> MemWrite
+                +----------------+----> ALUSrc
+                                 +----> ALUOp
+                                 +----> MemToReg
+                                 +----> Branch
+```
+
+---
+
+# Software
+
+以簡化的控制訊號表為例（部分 RISC-V 指令）：
+
+| Opcode 類型 | RegWrite | MemRead | MemWrite | ALUSrc | MemToReg | Branch |
+| --- | --- | --- | --- | --- | --- | --- |
+| R-type (`add`) | 1 | 0 | 0 | 0 (暫存器) | 0 (ALU 結果) | 0 |
+| I-type load (`lw`) | 1 | 1 | 0 | 1 (立即值) | 1 (記憶體值) | 0 |
+| S-type store (`sw`) | 0 | 0 | 1 | 1 (立即值) | x (不使用) | 0 |
+| B-type (`beq`) | 0 | 0 | 0 | 0 (暫存器) | x (不使用) | 1 |
+
+這張表本質上就是 Control Unit 的真值表，直接對應 `boolean_algebra` skill 中「從真值表寫出 SOP 表示式」的方法可以化簡成實際邏輯閘電路。
+
+---
+
+# Example
+
+執行 `lw x1, 0(x2)` 時，Control Unit 看到 I-type load 的 opcode，輸出：`RegWrite=1`（要寫回讀到的值）、`MemRead=1`（要讀 Data Memory）、`MemWrite=0`、`ALUSrc=1`（ALU 第二輸入用立即值，算出記憶體位址 = x2 + offset）、`MemToReg=1`（寫回的值來自記憶體，不是 ALU 結果）、`Branch=0`。這組訊號驅動 `single_cycle_datapath` 中所有 MUX 與致能訊號，讓硬體正確執行這個 load 指令。
+
+---
+
+# Common Mistakes
+
+- 把單週期設計的 Control Unit（純組合邏輯）跟多週期設計的 Control Unit（需要 FSM）混為一談，誤以為任何 Control Unit 都需要記住執行進度。
+- 忽略 `ALUOp` 通常還需要搭配指令的 `funct3`/`funct7` 欄位才能決定 ALU 具體該做哪一種運算（例如同樣是 R-type，`add` 跟 `sub` 的 opcode 相同，要看 `funct7` 才能區分）。
+
+---
+
+# Interview Questions
+
+- 為什麼單週期設計中 Control Unit 可以是純組合邏輯，不需要 FSM？
+- 為什麼把控制邏輯集中在 Control Unit，而不是分散寫在各個資料路徑元件裡？
+
+---
+
+# Summary
+
+Control Unit 依指令的 opcode（+funct3/funct7）產生驅動整個 datapath 的控制訊號（RegWrite、MemRead/Write、ALUSrc、ALUOp、MemToReg、Branch 等）；在單週期設計中它是純組合邏輯（查表機制），跟多週期設計中需要 FSM 記住執行進度的 Control Unit 有本質差異；集中設計讓新增/修改指令行為只需要調整這張表，不必更動資料路徑元件本身。

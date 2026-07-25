@@ -1,0 +1,81 @@
+# Metadata
+
+Name: combinational_logic
+Category: computer_architecture/logic
+Tags: [combinational-logic, mux, decoder, adder]
+Dependencies: []
+Related Skills: [synchronous_digital_systems]
+Difficulty: beginner
+
+---
+
+# Purpose
+
+CPU 裡幾乎所有「算東西」的元件（ALU、位址計算、選擇要不要 forwarding 的 MUX）都是組合邏輯電路。理解組合邏輯的定義與常見元件，是看懂任何 datapath 圖的前提。
+
+---
+
+# Concepts
+
+- **組合邏輯（Combinational Logic）**：輸出**只**由當下的輸入決定，沒有記憶性——同樣的輸入永遠得到同樣的輸出，跟過去發生過什麼無關。
+- **Multiplexer（MUX，多工器）**：依「選擇訊號（select）」從多個輸入中選一個當輸出。N 個選擇位元可以在 2^N 個輸入中選一個。
+- **Decoder（解碼器）**：把 N-bit 輸入轉成最多 2^N 條輸出線，恰好一條被啟動（one-hot），常用於「用位址選擇要啟動哪個暫存器/記憶體列」。
+- **Adder（加法器）**：實現二進位加法，常見設計是 Ripple-Carry Adder（逐位元串接進位，簡單但延遲隨 bit 數線性增加）。
+
+---
+
+# Theory
+
+判斷一個電路是不是純組合邏輯的關鍵測試：**畫出電路圖，如果沒有任何迴路把輸出接回輸入（且沒有正反器/latch），它就是組合邏輯**。組合邏輯的延遲（propagation delay）取決於訊號通過的最長邏輯閘路徑（critical path），這是後面 `synchronous_digital_systems` 決定「時脈週期最短能多短」的直接依據——時脈週期必須至少長過任何一段組合邏輯的最長延遲，否則下一級的正反器可能鎖存到還沒穩定的錯誤值。
+
+---
+
+# Hardware
+
+2-to-1 MUX（select S 選擇 A 或 B）：
+```
+A ---+
+     |  \
+     |   [MUX]---- Out = S ? B : A
+     |  /
+B ---+
+     |
+S ---+ (select)
+```
+邏輯式：`Out = S'A + SB`（正是 `boolean_algebra` skill 提到的 SOP 表示式）。
+
+---
+
+# Software
+
+Verilog 中的組合邏輯常用 `assign` 或 `always @(*)` 描述，例如 MUX：
+```verilog
+assign out = sel ? b : a;
+```
+若忘記在 `always` block 中列出所有輸入訊號當敏感清單（sensitivity list），合成工具可能誤判成需要記憶性的電路（推導出非預期的 latch），這是數位邏輯設計中常見的 bug 來源。
+
+---
+
+# Example
+
+Pipeline 的 forwarding MUX（見 `pipeline/forwarding.skill`）就是一個 3-to-1 MUX：select 訊號由 forwarding unit 產生，依判斷結果在「暫存器檔讀值」「EX/MEM 轉送值」「MEM/WB 轉送值」三者間選一個送進 ALU 輸入。
+
+---
+
+# Common Mistakes
+
+- 把「有正反器參與，但正反器輸出直接接組合邏輯」的整個電路都當成非組合邏輯——正反器本身不是組合邏輯，但它前後接的邏輯閘仍然是純組合邏輯，兩者要分開判斷。
+- 忽略 Ripple-Carry Adder 的延遲會隨 bit 數線性增加，在需要高速加法（例如 64-bit ALU）時，實務上會改用延遲更短的進位前瞻加法器（carry-lookahead adder）等設計。
+
+---
+
+# Interview Questions
+
+- 怎麼判斷一段電路是不是純組合邏輯？
+- 為什麼 Ripple-Carry Adder 的延遲隨 bit 數線性增加？
+
+---
+
+# Summary
+
+組合邏輯的輸出只取決於當下輸入、沒有記憶性；MUX、Decoder、Adder 是 CPU 中最常見的組合邏輯元件；組合邏輯的最長延遲路徑（critical path）直接決定同步系統時脈週期能多短。

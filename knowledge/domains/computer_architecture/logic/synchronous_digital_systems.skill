@@ -1,0 +1,86 @@
+# Metadata
+
+Name: synchronous_digital_systems
+Category: computer_architecture/logic
+Tags: [sds, clock, flip-flop, register, setup-time, hold-time]
+Dependencies: [combinational_logic]
+Related Skills: [fsm]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+純組合邏輯（`combinational_logic`）沒有記憶性，但 CPU 需要「記得」上一個週期算出的結果（例如 pipeline register、程式計數器 PC）。同步數位系統（Synchronous Digital Systems, SDS）用一個共同的時脈訊號協調所有元件「什麼時候該更新記憶的內容」，是幾乎所有現代數位電路的設計基礎。
+
+---
+
+# Concepts
+
+- **時脈（Clock）**：週期性的訊號，在特定邊緣（edge，通常是上升緣 rising edge）觸發所有正反器同時更新。
+- **正反器（Flip-Flop）**：最基本的記憶元件，在時脈邊緣把輸入值鎖存成新的輸出值，其餘時間輸出維持不變（不受輸入變化影響）。
+- **暫存器（Register）**：由多個並列的正反器組成，可以儲存一整個 word 的值（例如 pipeline register 就是一組暫存器）。
+- **Setup Time / Hold Time**：正反器對輸入訊號穩定時間的要求——輸入必須在時脈邊緣「之前」至少 setup time 就已經穩定，且在時脈邊緣「之後」至少 hold time 內繼續保持穩定，否則鎖存結果不可靠（metastability，介穩態）。
+
+---
+
+# Theory
+
+## 為什麼需要「同步」
+
+如果沒有共同時脈，每個正反器各自獨立決定何時更新，整個系統會進入不可預測的競爭狀態（race condition）：某個正反器的輸出改變，可能在另一個正反器還沒準備好接收新值時就傳到它的輸入端。同步設計用單一時脈訊號，強制規定「所有記憶元件只在同一個時間點（時脈邊緣）更新」，把整個系統的行為簡化成離散的「一個週期接一個週期」，讓設計與驗證都大幅簡化。
+
+## 時脈週期的下限
+
+一個同步系統的時脈週期，必須至少涵蓋：正反器本身的傳播延遲 + 這個週期內要通過的組合邏輯最長路徑延遲（critical path，見 `combinational_logic`）+ 下一個正反器的 setup time。這正是 pipeline 設計中「切更多 stage → 每個 stage 的組合邏輯更短 → 時脈週期可以更短 → 時脈頻率可以更高」這個直覺背後的精確依據。
+
+## Metastability
+
+如果違反 setup/hold time（例如輸入訊號在時脈邊緣附近才剛好變化），正反器可能進入一種既非穩定 0 也非穩定 1 的中間狀態（metastable），需要額外時間才能穩定下來，穩定後的值也可能不可預測。這是非同步訊號（例如外部中斷）進入同步系統時必須額外用同步器（synchronizer，通常是兩級正反器串接）處理的原因。
+
+---
+
+# Hardware
+
+暫存器（由正反器組成）的行為時序：
+
+```
+Clock:     __|‾|__|‾|__|‾|__|‾|__
+Input:     -----X=====X-----X====
+Output:    --old--|new (鎖存於上升緣)--
+                   ^
+              時脈上升緣：正反器把當下 Input 鎖存為新的 Output，
+              直到下一個上升緣之前，Output 都維持這個值不變
+```
+
+---
+
+# Software
+
+在 Chisel / Verilog 中，`reg` 或 `RegNext`（Chisel）這類建構明確表示「這是一個在時脈邊緣更新的記憶元件」，跟純組合邏輯的 `wire`/`assign` 語意上有本質差異——寫硬體描述語言時，混淆兩者（例如該用組合邏輯的地方誤用了帶時脈的暫存器）是常見的邏輯錯誤來源。
+
+---
+
+# Example
+
+Pipeline register（見 `pipeline/pipeline_register.skill`）就是同步數位系統最直接的應用：`IF/ID`、`ID/EX` 等 pipeline register 都是在同一個共同時脈的上升緣，把左邊 stage 這個週期算出的組合邏輯結果鎖存下來，成為右邊 stage 下一個週期的輸入。
+
+---
+
+# Common Mistakes
+
+- 把「時脈週期可以多短」只看正反器本身的延遲，忽略還要加上這個週期內組合邏輯的 critical path 延遲與下一級的 setup time。
+- 忽略非同步訊號（外部中斷、按鈕輸入）直接接進同步系統可能違反 setup/hold time、造成 metastability，誤以為只要邏輯正確就一定不會出問題。
+
+---
+
+# Interview Questions
+
+- 為什麼時脈週期不能只看正反器延遲，還要考慮組合邏輯的 critical path？
+- 什麼是 metastability？為什麼非同步輸入訊號需要經過同步器才能安全接進同步系統？
+
+---
+
+# Summary
+
+同步數位系統用共同時脈訊號協調所有正反器/暫存器只在時脈邊緣更新，避免競爭狀態；時脈週期下限取決於正反器延遲+組合邏輯 critical path+setup time；違反 setup/hold time 會造成 metastability，是非同步訊號需要同步器的原因。

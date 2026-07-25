@@ -19,15 +19,16 @@ pipeline_hazard:
     - pipeline_overview
     - pipeline_register
   optional: []
-  # forward reference: conceptually also assumes a single-cycle datapath
-  # baseline (domains/computer_architecture/datapath/, status: planned).
+  # cross-folder dependency (now built): ../datapath/single_cycle_datapath.skill
+  # -- pipeline is single_cycle_datapath split into overlapping stages, so
+  # hazard reasoning assumes that baseline datapath.
 
 forwarding:
   requires:
     - pipeline_overview
     - pipeline_hazard
   optional: []
-  # forward reference: domains/computer_architecture/datapath/ (planned)
+  # cross-folder dependency (now built): ../datapath/single_cycle_datapath.skill
 
 stall:
   requires:

@@ -1,0 +1,17 @@
+number_representation:
+  requires: []
+  optional: []
+
+floating_point:
+  requires:
+    - number_representation
+  optional: []
+
+boolean_algebra:
+  requires: []
+  optional: []
+
+c_memory_layout:
+  requires:
+    - number_representation
+  optional: []

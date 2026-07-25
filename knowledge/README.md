@@ -40,17 +40,17 @@ knowledge/
 
 ## Status
 
-**Phase 1 (scaffolding) + Phase 2 proof-of-concept are done**: the global router,
-shared skills, template, the `computer_architecture` domain router/overview, and one
-fully-built sub-domain (`pipeline/`, 8 topic skills) exist below.
+**4 of 12 `computer_architecture` sub-domains are built**: `foundations` (4 topics),
+`logic` (3 topics), `datapath` (2 topics), `pipeline` (8 topics) — 17 topic skills
+total, plus the global router, shared skills, template, and the domain
+router/overview. `pipeline/manifest.yaml`'s cross-folder dependency on
+`datapath/single_cycle_datapath` is now a real reference, not a forward reference to
+a placeholder.
 
-**Not yet built**: the other `computer_architecture` sub-domains listed in
-`domains/computer_architecture/manifest.yaml` (`foundations`, `isa`, `assembly`,
-`logic`, `datapath`, `cache`, `virtual_memory`, `performance`, `parallel`, `linux`,
-`practice`), and every domain besides `computer_architecture` listed in the top-level
-`router.skill`. `pipeline/manifest.yaml` references `datapath` as a cross-folder
-dependency that doesn't exist yet — treat it as a placeholder until that sub-domain is
-built.
+**Not yet built**: the remaining `computer_architecture` sub-domains listed in
+`domains/computer_architecture/manifest.yaml` (`isa`, `assembly`, `cache`,
+`virtual_memory`, `performance`, `parallel`, `linux`, `practice`), and every domain
+besides `computer_architecture` listed in the top-level `router.skill`.
 
 Content is written as original explanation grounded in NCKU's Computer Architecture
 course structure (see `computer_architecture/overview.skill` for the source list) —

@@ -1,0 +1,110 @@
+# Metadata
+
+Name: c_memory_layout
+Category: computer_architecture/foundations
+Tags: [c-memory, stack, heap, memory-layout]
+Dependencies: [number_representation]
+Related Skills: []
+Difficulty: beginner
+
+---
+
+# Purpose
+
+理解 C 程式執行時記憶體怎麼被切分使用，是後面理解 calling convention（`assembly` sub-domain）、virtual memory 分頁配置的基礎——很多看似「作業系統」的問題（stack overflow、memory leak、buffer overflow）根源都在於誤解了這個記憶體佈局。
+
+---
+
+# Concepts
+
+一個執行中的 C 程式，虛擬位址空間由低位址到高位址（實際排列依平台略有差異，這是常見教學慣例）通常包含：
+
+1. **Text（Code）Segment**：編譯後的機器指令，通常唯讀。
+2. **Data Segment**：已初始化的全域變數/靜態變數（`static int x = 5;`）。
+3. **BSS Segment**：未初始化（或初始化為 0）的全域變數/靜態變數，載入時由系統清零，不佔實際檔案空間。
+4. **Heap**：動態配置記憶體（`malloc`/`free`），由低位址往高位址成長。
+5. **Stack**：函式呼叫的區域變數、返回位址、儲存的暫存器，由高位址往低位址成長。
+
+---
+
+# Theory
+
+## 為什麼 Heap 與 Stack 要從相反方向成長
+
+Heap 跟 Stack 的大小在編譯時都無法確定（取決於執行期間動態配置多少、函式呼叫巢狀多深），把它們放在位址空間的兩端、往彼此靠近的方向成長，是為了讓兩者共用中間的空閒空間、盡可能有效利用——只要兩者沒有真的相遇（overlap），大小都可以彈性伸縮。當 Stack 成長太深（例如無窮遞迴）而跟 Heap 相撞，就是典型的 **stack overflow**。
+
+## BSS 為什麼不佔檔案空間
+
+BSS（Block Started by Symbol）裡的變數反正都要被清成 0，執行檔（例如 ELF）沒有必要真的把一長串 0 存進檔案裡佔空間——只需要在 ELF 中記錄「這個 segment 有多大、載入時清零」，實際的 0 值由 loader 在程式啟動時動態配置並清空即可，這是明確的空間優化。
+
+## Stack Frame 與 Calling Convention 的關聯
+
+每次函式呼叫，Stack 上會建立一個新的 **stack frame**，存放：呼叫者的返回位址、被呼叫函式的區域變數、需要保存的暫存器。這個機制是後續 `assembly` sub-domain 中 calling convention（例如哪些暫存器由呼叫者保存、哪些由被呼叫者保存）的具體記憶體基礎。
+
+---
+
+# Hardware
+
+典型虛擬位址空間示意（低位址在上，高位址在下，示意圖，實際位址值依平台不同）：
+
+```
+高位址   +------------------+
+         |      Stack       |  <- 往低位址方向成長（函式呼叫時）
+         |        |         |
+         |        v         |
+         |                  |
+         |     (空閒空間)     |
+         |                  |
+         |        ^         |
+         |        |         |
+         |       Heap       |  <- 往高位址方向成長（malloc 時）
+         +------------------+
+         |       BSS        |  未初始化全域/靜態變數
+         +------------------+
+         |       Data       |  已初始化全域/靜態變數
+         +------------------+
+低位址   |       Text       |  程式指令（唯讀）
+         +------------------+
+```
+
+---
+
+# Software
+
+```c
+int global_init = 5;      // Data segment
+int global_uninit;        // BSS segment
+int main() {
+    int local = 10;        // Stack（區域變數）
+    int *p = malloc(sizeof(int));  // p 本身在 Stack，*p 指向的記憶體在 Heap
+    ...
+}
+```
+
+`global_init` 因為有初值，存在 Data segment（佔實際檔案空間）；`global_uninit` 沒有初值（預設為 0），存在 BSS（不佔實際檔案空間）；`local` 是函式內的區域變數，存在 Stack；`malloc` 配置的記憶體在 Heap，其位址被存在 Stack 上的指標變數 `p` 裡。
+
+---
+
+# Example
+
+無窮遞迴為什麼會造成 stack overflow：每次遞迴呼叫都在 Stack 上建立新的 stack frame（往低位址成長），如果遞迴沒有終止條件，Stack 會不斷成長，直到跟 Heap（或位址空間的另一端界線）相撞，作業系統偵測到後終止程式並回報 stack overflow。
+
+---
+
+# Common Mistakes
+
+- 把「未初始化的全域變數」跟「未初始化的區域變數」混為一談——前者在 BSS，保證是 0；後者在 Stack 上，值是未定義（可能是任何殘留在那塊記憶體上的舊值）。
+- 誤以為 Heap 跟 Stack 相撞才是唯一的記憶體問題來源，忽略 Stack 本身也有系統設定的大小上限（例如過深的遞迴、過大的區域陣列也可能單獨造成 stack overflow，不必等到真的碰到 Heap）。
+
+---
+
+# Interview Questions
+
+- 為什麼未初始化的全域變數（BSS）跟未初始化的區域變數（Stack）在「值是否保證為 0」這件事上不同？
+- 為什麼 Heap 跟 Stack 通常設計成往相反方向成長？
+
+---
+
+# Summary
+
+C 程式的虛擬位址空間由低到高大致排列為 Text → Data → BSS → Heap → (空閒) → Stack；Heap 往高位址成長、Stack 往低位址成長，共用中間空間、相撞即為 stack overflow；BSS 不佔實際檔案空間，由 loader 在啟動時清零；Stack frame 的結構是後續 calling convention 的具體基礎。

@@ -1,0 +1,76 @@
+# Metadata
+
+Name: foundations-router
+Category: router
+Tags: [router, foundations, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/reasoning]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `foundations` 這個 sub-domain 的問題（數字表示法、布林代數、C 記憶體配置這類「動手做硬體/組合語言之前必須先懂的基礎」），需要載入哪些 Topic Skills，並依 `manifest.yaml` 解析依賴。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `number_representation` | 二進位、有號數表示法（two's complement）、進位轉換 |
+| `floating_point` | IEEE 754 浮點數表示法、精度問題 |
+| `boolean_algebra` | 布林代數基本律、真值表、邏輯化簡 |
+| `c_memory_layout` | C 程式的記憶體區段（text/data/heap/stack） |
+
+---
+
+# Theory
+
+這四個 Topic 都是「後面所有 CA 主題共用的語言」：`isa`/`assembly` 需要 `number_representation` 才能解釋立即值編碼；`logic`/`datapath` 需要 `boolean_algebra` 才能解釋邏輯閘化簡；`c_memory_layout` 是後面談 stack frame、calling convention（`assembly`）與 virtual memory 的前提。因此 `foundations` 底下彼此依賴很淺（大多互相獨立），但被其他 sub-domain 大量引用。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `floating_point`、`c_memory_layout` 展開 `requires` 到 `number_representation`。
+3. 若問題其實是在問 `isa`/`assembly`/`logic`/`datapath` 等更進階主題只是「順便」用到基礎知識，判斷屬於那個 sub-domain，`foundations` 的對應 Topic Skill 作為它們的 `requires` 由那個 sub-domain 的 manifest 自行處理，不必由 `foundations-router` 主動介入。
+
+---
+
+# Example
+
+```
+問題：IEEE 754 單精度浮點數怎麼表示 -6.5？
+直接對應: floating_point
+Requires 展開: number_representation
+最終載入: number_representation, floating_point
+```
+
+---
+
+# Common Mistakes
+
+- 把 `foundations` 誤判成「什麼都能用得上所以什麼都載入」，實際上只在問題明確在問這四個主題本身時才由這個 router 處理。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`foundations` router 判斷數字表示法/布林代數/C 記憶體配置這類基礎問題該載入哪個 Topic Skill，這些 Topic 彼此依賴淺，但是其他 sub-domain 的常見先備知識。
