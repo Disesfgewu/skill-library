@@ -1,0 +1,75 @@
+# Metadata
+
+Name: assembly-router
+Category: router
+Tags: [router, assembly, calling-convention, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `assembly` 這個 sub-domain 的問題（RISC-V 組合語言撰寫、函式呼叫慣例），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `risc_v_assembly` | 組合語言的撰寫慣例：pseudo-instruction、組譯器如何展開、常見程式模式（迴圈、條件） |
+| `calling_convention` | 函式呼叫時暫存器的使用慣例、stack frame 配置 |
+
+---
+
+# Theory
+
+`risc_v_assembly` 是先備知識：必須先熟悉組合語言怎麼寫，才能理解 `calling_convention` 規定的是「這些指令該怎麼組合起來，才能讓不同人寫的函式互相呼叫時不會互相踩到對方用的暫存器」。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `calling_convention` 展開依賴到 `risc_v_assembly`。
+3. 問題若牽涉「呼叫函式時暫存器怎麼保存」，屬於 `calling_convention`，且應同時載入 `foundations/c_memory_layout`（stack frame 概念）當背景知識——由 `computer_architecture-router` 在更上層判斷跨 sub-domain 依賴。
+
+---
+
+# Example
+
+```
+問題：為什麼呼叫函式前要先把某些暫存器存到堆疊？
+直接對應: calling_convention
+Requires 展開: risc_v_assembly
+最終載入: risc_v_assembly, calling_convention
+（可能還需要 foundations/c_memory_layout，見上方 Software 段說明）
+```
+
+---
+
+# Common Mistakes
+
+- 把 pseudo-instruction（例如 `li`、`mv`，組譯器展開出來的，非硬體真正的指令）跟 `isa/risc_v_instructions` 定義的硬體指令混為一談。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`assembly` router 判斷組合語言撰寫與函式呼叫慣例相關問題該載入的 Topic Skill，`risc_v_assembly` 是 `calling_convention` 的先備知識。

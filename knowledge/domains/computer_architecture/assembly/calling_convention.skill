@@ -1,0 +1,93 @@
+# Metadata
+
+Name: calling_convention
+Category: computer_architecture/assembly
+Tags: [calling-convention, abi, stack-frame, risc-v]
+Dependencies: [risc_v_assembly]
+Related Skills: [foundations/c_memory_layout]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+RISC-V 有 32 個通用暫存器，但完全沒有硬體機制強制規定「函式呼叫時哪些暫存器該保存」——如果每個函式各自決定要不要保存暫存器，一旦互相呼叫，一定會有函式的資料被另一個函式覆蓋。Calling convention（呼叫慣例，屬於 ABI, Application Binary Interface 的一部分）是一套**純軟體約定**，讓不同人（甚至不同編譯器）寫的程式碼可以正確地互相呼叫函式。
+
+---
+
+# Concepts
+
+RISC-V 標準呼叫慣例將暫存器分類（節錄常用者）：
+
+- **`a0`-`a7`（引數/回傳值暫存器）**：傳遞函式引數，`a0`-`a1` 也用於回傳值。
+- **`ra`（return address，即 `x1`）**：呼叫指令（`jal`）自動把返回位址存在這裡。
+- **`sp`（stack pointer，即 `x2`）**：指向堆疊頂端。
+- **`t0`-`t6`（temporary，暫時暫存器）**：呼叫者保存（caller-saved）——被呼叫函式可以自由覆寫，呼叫者若呼叫後還需要這些值，必須自己先存好。
+- **`s0`-`s11`（saved，保存暫存器）**：被呼叫者保存（callee-saved）——被呼叫函式若要用這些暫存器，必須先把原值存到堆疊、返回前復原，呼叫者可以放心假設呼叫前後這些值不變。
+
+---
+
+# Theory
+
+## Caller-saved 與 Callee-saved 的設計取捨
+
+這個分類本質上是一個效率取捨：如果一個值只在呼叫者的短期運算中用得到、呼叫後不再需要，用 caller-saved 暫存器最有效率（根本不需要保存，因為呼叫者本來就不 care 這個值被覆寫）；如果一個值需要橫跨整個函式呼叫、呼叫後還要繼續用，放進 callee-saved 暫存器最有效率（呼叫者完全不用操心，被呼叫函式若要用就自己負責保存/復原，且只有真正用到的那幾個才需要保存，不是每次呼叫都全部保存）。這是編譯器在做暫存器配置（register allocation）時的核心依據。
+
+## `ra` 為什麼可能需要被保存
+
+`jal` 呼叫時自動把返回位址寫入 `ra`。但如果函式 A 呼叫函式 B（B 又呼叫函式 C），A 呼叫 B 時 `ra` 被寫入「回到 A 的位址」；若 B 自己又用 `jal` 呼叫 C，`ra` 會被覆寫成「回到 B 的位址」——如果 B 沒有事先把原本的 `ra`（回到 A 的位址）存到堆疊，等 B 要返回 A 時就找不到正確的返回位址了。這正是為什麼**任何會再呼叫其他函式的函式（non-leaf function）**，開頭幾乎一定要把 `ra` 存到堆疊，這是 calling convention 中最容易被忽略、卻最常導致 bug 的細節。
+
+## Stack Frame 與 `foundations/c_memory_layout` 的關聯
+
+每次函式呼叫，在 Stack 上建立的那塊區域（stack frame，見 `foundations/c_memory_layout`）具體存放的內容，正是本 skill 描述的「需要保存的 callee-saved 暫存器」與「需要保存的 `ra`」，加上區域變數——這是 `c_memory_layout` 描述的抽象記憶體佈局，在 calling convention 這一層被賦予具體的內容。
+
+---
+
+# Hardware
+
+（不適用 — calling convention 是純軟體約定，硬體對此一無所知，`jal`/`jalr` 只負責跳躍與寫入返回位址這兩件事，暫存器該不該保存完全是軟體的責任）
+
+---
+
+# Software
+
+一個 non-leaf function 的典型 prologue（開頭）/epilogue（結尾）：
+```
+func:
+        addi sp, sp, -16    # 開闢 16 bytes 的 stack frame
+        sw   ra, 12(sp)      # 保存 ra（因為 func 內部還會呼叫別的函式）
+        sw   s0,  8(sp)      # 保存 s0（因為 func 內部要用它）
+        ...                  # 函式主體，可以安全使用 s0、可以呼叫其他函式
+        lw   ra, 12(sp)      # 復原 ra
+        lw   s0,  8(sp)      # 復原 s0
+        addi sp, sp, 16      # 收回 stack frame
+        jalr x0, 0(ra)       # 返回呼叫者
+```
+
+---
+
+# Example
+
+如果 `func` 忘記保存 `ra`（省略上面的 `sw ra, 12(sp)` 與對應的 `lw`），且 `func` 內部又呼叫了另一個函式 `helper`：`jal` 呼叫 `helper` 時會把 `ra` 覆寫成「回到 `func` 內部呼叫點」的位址，`func` 原本存的「回到呼叫者」的位址就永久遺失了——`func` 執行完 `jalr x0, 0(ra)` 時，會跳回 `func` 呼叫 `helper` 那一行，而不是真正的呼叫者，程式陷入無窮迴圈或跳到錯誤的地方。這是 non-leaf function 沒保存 `ra` 最典型的災難性後果。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「只要函式不使用某個 callee-saved 暫存器（例如 `s0`），就不需要在意 calling convention」，這個直覺忽略了 `ra` 是所有 non-leaf function 都必須考慮的特例（見上方 Theory 段）——即使函式完全不碰 `s0`-`s11`，只要它內部呼叫了其他函式，就必須保存 `ra`，這是最容易被忽略、也最容易造成難以除錯的返回位址錯亂問題的地方，可以用上方 Example 的情境驗證。
+- 把「呼叫者保存」跟「被呼叫者保存」的責任方向記反——caller-saved 是「呼叫者若在乎這個值,呼叫前要自己存」，callee-saved 是「被呼叫函式若要用,自己負責存/復原」，兩者的「保存」動作發生在不同函式、不同時間點。
+
+---
+
+# Interview Questions
+
+- 為什麼 non-leaf function（內部會呼叫其他函式的函式）幾乎一定要保存 `ra`，即使它完全不使用其他 callee-saved 暫存器？
+- Caller-saved 跟 callee-saved 的分類，本質上是在最佳化什麼？
+
+延伸思考：如果一個函式是 leaf function（內部完全不呼叫其他函式），它還需要保存 `ra` 嗎？為什麼很多編譯器產生的組合語言，即使是簡單的 leaf function，也常常看到完整的 prologue/epilogue？
+
+---
+
+# Summary
+
+Calling convention 是純軟體約定（硬體對此一無所知），把暫存器分成 caller-saved（`t0`-`t6`）、callee-saved（`s0`-`s11`）、以及有特殊角色的 `ra`/`sp`/`a0`-`a7`；核心設計取捨是「誰在乎這個值、誰就負責保存」；non-leaf function 必須保存 `ra`（否則巢狀呼叫會覆寫返回位址）是最容易被忽略卻最致命的細節；stack frame 的具體內容正是這些需要保存的暫存器加上區域變數。

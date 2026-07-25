@@ -1,0 +1,10 @@
+risc_v_assembly:
+  requires: []
+  optional: []
+  # cross-folder: isa/risc_v_instructions, isa/instruction_formats
+
+calling_convention:
+  requires:
+    - risc_v_assembly
+  optional: []
+  # cross-folder: foundations/c_memory_layout (stack frame)

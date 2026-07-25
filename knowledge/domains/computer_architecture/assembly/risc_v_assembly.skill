@@ -1,0 +1,91 @@
+# Metadata
+
+Name: risc_v_assembly
+Category: computer_architecture/assembly
+Tags: [risc-v, assembly, pseudo-instruction, assembler]
+Dependencies: []
+Related Skills: [calling_convention, isa/risc_v_instructions]
+Difficulty: beginner
+
+---
+
+# Purpose
+
+`isa/risc_v_instructions` 定義硬體實際執行的指令，但人手寫（或編譯器產生）的組合語言程式碼裡，常出現一些硬體根本沒有的「指令」，例如 `li x1, 100`（load immediate）、`mv x1, x2`（move）——這個 skill 說明這些從何而來，以及組合語言到底怎麼被轉換成硬體真正執行的指令。
+
+---
+
+# Concepts
+
+- **Pseudo-instruction（偽指令）**：組合語言中方便撰寫、但不對應任何單一硬體指令的「指令」，由組譯器（assembler）展開成一條或多條真正的硬體指令。
+- **Label（標籤）**：組合語言中用來標記位址的符號名稱（例如迴圈的 `loop:`），組譯器負責把它換算成實際的位址偏移量。
+- **常見程式模式**：迴圈（用條件分支 + 無條件跳躍實現）、if-else（用條件分支的反邏輯 + 跳躍實現）。
+
+---
+
+# Theory
+
+## 為什麼需要 pseudo-instruction
+
+如果每次要「把一個 32-bit 常數放進暫存器」都得手動拆成 `lui`（放高 20 bits）+ `addi`（放低 12 bits，還要處理正負號進位的邊界情況）兩條指令、還要自己處理進位細節，寫組合語言會非常繁瑣且容易出錯。`li x1, 100` 這個 pseudo-instruction 讓程式設計者不用管底層細節，組譯器依常數大小自動決定該展開成一條 `addi`（常數夠小）還是 `lui`+`addi` 兩條（常數較大）。這是「把重複、機械化的工作交給工具」的具體例子——跟後面 `assembly` 領域外，`isa/risc_vs_cisc` 談到「編譯器產生指令，不需要遷就人工撰寫方便性」的哲學是一體兩面：pseudo-instruction 存在的意義正是為了服務**人**寫組合語言時的方便，跟硬體設計本身無關。
+
+## Label 與位址計算
+
+分支/跳躍指令（`beq`、`jal`）的立即值編碼的其實是**位址偏移量**（相對於目前 PC 的距離），不是絕對位址（見 `isa/instruction_formats` 的 B-type、J-type 編碼）。組譯器在組譯時掃過整個程式、記錄每個 label 對應的位址，再把組合語言中的 `beq x1, x2, loop` 換算成「loop 位址 - 目前指令位址」這個具體的偏移量，填進指令的立即值欄位。
+
+---
+
+# Hardware
+
+（不適用 — pseudo-instruction 的展開是組譯器行為，非硬體行為；硬體只認得展開後的真實指令）
+
+---
+
+# Software
+
+常見 pseudo-instruction 與其展開：
+```
+li   x1, 5        展開為  addi x1, x0, 5        (常數夠小，x0 恆為 0)
+mv   x1, x2        展開為  addi x1, x2, 0        (加 0 等於複製)
+nop                展開為  addi x0, x0, 0        (寫入 x0 等於什麼都不做)
+j    label          展開為  jal  x0, label        (跳躍但不需要記錄返回位址)
+```
+
+迴圈範例（`for (i=0; i<10; i++) ...`，x1 存 i）：
+```
+        addi x1, x0, 0        # i = 0
+loop:
+        beq  x1, x10, end      # 若 i == 10，跳出迴圈（x10 事先存 10）
+        ...                    # 迴圈主體
+        addi x1, x1, 1        # i++
+        jal  x0, loop          # 跳回 loop（j pseudo-instruction 展開）
+end:
+```
+
+---
+
+# Example
+
+`nop` 為什麼展開成 `addi x0, x0, 0`：RISC-V 中 x0 這個暫存器被硬體規定永遠讀出 0、寫入被忽略（不會真的改變任何值），所以「對 x0 做加法後寫回 x0」在架構狀態上等於什麼事都沒發生，卻仍然完整走過一次 pipeline（有實際佔用一個週期），這正好符合「no operation」的需求，而不需要硬體另外設計一條專門的 NOP 指令。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「`li`、`mv`、`nop` 是 RISC-V 硬體真正認得的指令」，這個直覺來自它們在組合語言中看起來跟 `add`、`addi` 一樣自然地被使用，但它們是**組譯器層次**的方便寫法，硬體的 Control Unit（見 `datapath/control_unit`）根本沒有對應這些名稱的 opcode——反組譯（disassemble）一個已組譯好的執行檔會發現它們都已經變回 `addi` 等真實指令，可以用實際的組譯器/反組譯器工具驗證這一點。
+- 把 label 對應的位址想成組合語言程式碼裡「寫死」的絕對位址——實際上是組譯器事後算出來的相對位移量，同一段程式碼被載入到不同記憶體位址執行，指令內部的相對位移量通常不需要改變（這也是為什麼相對定址對於產生「位置無關程式碼」position-independent code 很重要）。
+
+---
+
+# Interview Questions
+
+- 為什麼 `nop` 可以用 `addi x0, x0, 0` 實現，而不需要硬體另外設計一條指令？
+- 組譯器怎麼決定 `li` 該展開成一條指令還是兩條指令？
+
+延伸思考：如果一個分支的目標離目前指令太遠、超過 B-type 立即值欄位能表示的範圍，組譯器會怎麼處理？（提示：想想 pseudo-instruction 展開的機制能不能延伸到這種情況）
+
+---
+
+# Summary
+
+Pseudo-instruction（`li`、`mv`、`nop`、`j` 等）是組譯器提供的便利寫法，會被展開成一條或多條真正的硬體指令，硬體本身不認得這些名稱；Label 對應的是組譯器算出的相對位址偏移量，不是寫死的絕對位址；理解這層「組合語言 → 組譯器 → 硬體指令」的轉換，才能正確解讀反組譯結果、理解位置無關程式碼的原理。
