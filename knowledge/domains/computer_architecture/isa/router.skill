@@ -1,0 +1,75 @@
+# Metadata
+
+Name: isa-router
+Category: router
+Tags: [router, isa, risc-v, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/citation, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `isa` 這個 sub-domain 的問題（指令集架構本身：有哪些指令、指令怎麼編碼、RISC 與 CISC 的設計哲學差異），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `risc_v_instructions` | RISC-V 基本指令分類：算術/邏輯、資料搬移、控制流 |
+| `instruction_formats` | RISC-V 指令編碼格式（R/I/S/B/U/J type） |
+| `risc_vs_cisc` | RISC 與 CISC 的設計哲學比較 |
+
+---
+
+# Theory
+
+`risc_v_instructions` 是先備知識：必須先知道有哪些指令、指令做什麼，才能理解 `instruction_formats` 在編碼「什麼」；`risc_vs_cisc` 則是站在兩者之上的比較性、設計哲學層次的主題，需要具體指令與編碼格式當作論證的實例，而不是抽象空談。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `instruction_formats`、`risc_vs_cisc` 展開依賴到 `risc_v_instructions`。
+3. 問題若在問「這個指令的二進位編碼是什麼」，屬於 `instruction_formats`；若在問「為什麼 RISC-V 這樣設計、跟 x86 有什麼不同」，屬於 `risc_vs_cisc`，需額外載入 `instruction_formats` 當比較依據。
+
+---
+
+# Example
+
+```
+問題：RISC-V 的 addi 指令屬於哪一種格式？
+直接對應: instruction_formats
+Requires 展開: risc_v_instructions
+最終載入: risc_v_instructions, instruction_formats
+```
+
+---
+
+# Common Mistakes
+
+- 把「這個指令怎麼編碼」跟「為什麼 RISC 要這樣設計」混為同一類問題處理，兩者需要的知識深度與載入的 Topic Skill 不同。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`isa` router 依「指令本身 → 編碼格式 → 設計哲學比較」的層次，判斷 ISA 相關問題該載入的 Topic Skill；`risc_v_instructions` 是共同先備知識。

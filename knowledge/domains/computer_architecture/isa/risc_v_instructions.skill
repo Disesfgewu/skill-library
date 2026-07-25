@@ -1,0 +1,94 @@
+# Metadata
+
+Name: risc_v_instructions
+Category: computer_architecture/isa
+Tags: [risc-v, isa, instructions, load-store-architecture]
+Dependencies: []
+Related Skills: [instruction_formats, risc_vs_cisc]
+Difficulty: beginner
+
+---
+
+# Purpose
+
+`single_cycle_datapath`、`pipeline` 一系列 skill 都以 RISC-V 指令當範例，但沒有正式定義 RISC-V 指令集本身有哪些指令、分成哪些類別。這個 skill 補上這塊：不懂指令集本身，前面所有 datapath/pipeline 的範例都只是背下來的符號，無法自己推廣到沒看過的指令。
+
+---
+
+# Concepts
+
+RISC-V 基本整數指令集（RV32I）依功能可分：
+
+- **算術/邏輯運算**：`add`、`sub`、`and`、`or`、`xor`、`sll`（左移）、`srl`/`sra`（右移）等，運算元皆來自暫存器（R-type）或暫存器+立即值（I-type，例如 `addi`）。
+- **資料搬移（Load/Store）**：`lw`（load word）、`sw`（store word）等，是**唯一**能存取記憶體的指令。
+- **控制流**：`beq`/`bne`（條件分支）、`jal`/`jalr`（無條件跳躍/呼叫）。
+- **上位元指令（Upper Immediate）**：`lui`、`auipc`，用來組合出比單一指令立即值欄位更大的常數。
+
+---
+
+# Theory
+
+## Load-Store Architecture（暫存器-記憶體分離架構）
+
+RISC-V（以及絕大多數 RISC 設計）是嚴格的 **load-store architecture**：所有算術/邏輯運算只能對暫存器操作，**唯一**能碰記憶體的指令是 load 跟 store。這跟 CISC（例如 x86）允許「直接對記憶體位址做加法」這種指令形成鮮明對比（詳見 `risc_vs_cisc`）。
+
+這個限制不是任意的：它讓 `single_cycle_datapath` 中 ALU 的輸入只需要處理「暫存器值」或「立即值」兩種來源，不需要處理「記憶體位址運算後直接送進 ALU 又要送回記憶體」這種複雜資料流，直接簡化了硬體設計，也讓 `pipeline_hazard` 中的資料相依分析更容易（只有 load 指令的結果需要特別處理 load-use hazard，見 `pipeline/stall.skill`）。
+
+## 為什麼指令數量少（相對於 CISC）
+
+RISC 的哲學是「用少量簡單指令的組合，取代少量複雜指令」——例如 RISC-V 沒有「乘加」這種單一複雜指令（要另外裝 M extension 才有乘法），複雜運算靠組合多條簡單指令完成。這個設計哲學的量化依據，屬於 `risc_vs_cisc` 的討論範圍。
+
+---
+
+# Hardware
+
+（見 `single_cycle_datapath`、`pipeline_overview` 的硬體圖，RISC-V 指令直接對應那些圖中的資料流）
+
+---
+
+# Software
+
+RISC-V 指令範例與語意：
+
+```
+add  x1, x2, x3      # x1 = x2 + x3
+addi x1, x2, 10       # x1 = x2 + 10（立即值）
+lw   x1, 8(x2)        # x1 = Memory[x2 + 8]
+sw   x1, 8(x2)        # Memory[x2 + 8] = x1
+beq  x1, x2, label     # 若 x1 == x2，跳到 label
+jal  x1, func          # 呼叫 func，把返回位址存進 x1
+```
+
+---
+
+# Example
+
+計算 `a[i] = a[i] + 1`（假設 x1 存 a 的基底位址、x2 存 i×4）：
+```
+lw   x3, 0(x1)     # x3 = Memory[x1 + x2]  (需先算出 x1+x2，此處簡化)
+addi x3, x3, 1     # x3 = x3 + 1
+sw   x3, 0(x1)     # Memory[x1 + x2] = x3
+```
+注意：即使只是「陣列元素加 1」這麼簡單的操作，也必須先 load 到暫存器、在暫存器上做加法、再 store 回去——這正是 load-store architecture 的直接體現，沒有「直接對記憶體位址做加法」的指令。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「RISC-V 應該也有某條指令可以直接把記憶體某個位址的值加 1（read-modify-write 一步到位）」，這個直覺其實來自 x86 的 `INC [mem]` 這類 CISC 指令的印象，但 RISC-V 嚴格禁止這種指令——load-store architecture 規定只有 `lw`/`sw` 能碰記憶體，任何運算都要先讀進暫存器。可以直接查 RISC-V ISA Specification [Specification: RISC-V ISA Manual] 驗證：整數指令集裡沒有任何一條指令同時包含記憶體運算元與算術運算元。
+- 把 `jal`/`jalr` 單純當成「跳躍」指令，忽略它們同時會把返回位址寫入目的暫存器——這正是 RISC-V 實現函式呼叫（calling convention，見 `assembly` sub-domain）的硬體基礎，不理解這點會誤以為函式呼叫需要額外指令才能記住返回位址。
+
+---
+
+# Interview Questions
+
+- 為什麼 load-store architecture 能簡化 pipeline 的 hazard 分析？
+- RISC-V 的 `jal` 指令跟純粹的「跳躍」指令，在硬體/軟體語意上差在哪裡？
+
+延伸思考：如果 RISC-V 允許 `add x1, 0(x2), x3`（直接對記憶體位址做加法），`pipeline_hazard.skill` 描述的 RAW hazard 分析會變得更複雜還是更簡單？為什麼？
+
+---
+
+# Summary
+
+RISC-V 是嚴格的 load-store architecture：算術/邏輯指令只操作暫存器，唯一能存取記憶體的是 load/store，控制流指令（含 `jal`/`jalr`）負責跳躍與函式呼叫的返回位址記錄；這個設計哲學直接簡化了 datapath 與 pipeline hazard 分析，是 RISC 相對 CISC 的核心差異之一。

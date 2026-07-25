@@ -4,7 +4,7 @@ Name: global-router
 Category: router
 Tags: [router, domain-classification, entrypoint]
 Dependencies: []
-Related Skills: [shared/teaching, shared/reasoning]
+Related Skills: [shared/teaching, shared/reasoning, shared/jserv_style]
 Difficulty: n/a
 
 ---

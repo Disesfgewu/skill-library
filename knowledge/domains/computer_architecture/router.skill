@@ -4,7 +4,7 @@ Name: computer_architecture-router
 Category: router
 Tags: [router, computer-architecture, topic-classification]
 Dependencies: [overview]
-Related Skills: [shared/teaching, shared/reasoning, shared/diagram, shared/citation]
+Related Skills: [shared/teaching, shared/reasoning, shared/diagram, shared/citation, shared/jserv_style]
 Difficulty: n/a
 
 ---

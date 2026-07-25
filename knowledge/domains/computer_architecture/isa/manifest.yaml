@@ -1,0 +1,15 @@
+risc_v_instructions:
+  requires: []
+  optional: []
+  # cross-folder: foundations/number_representation (immediate encoding)
+
+instruction_formats:
+  requires:
+    - risc_v_instructions
+  optional: []
+
+risc_vs_cisc:
+  requires:
+    - risc_v_instructions
+  optional:
+    - instruction_formats
