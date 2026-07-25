@@ -1,0 +1,76 @@
+# Metadata
+
+Name: parallel-router
+Category: router
+Tags: [router, parallelism, multithreading, topic-classification]
+Dependencies: []
+Related Skills: [shared/reasoning, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `parallel` 這個 sub-domain 的問題（多執行緒、同步、cache 一致性、記憶體模型），需要載入哪些 Topic Skills。本身不回答問題內容。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `multithreading` | 多執行緒的動機與基本問題（race condition） |
+| `synchronization` | Lock、atomic 指令等同步機制 |
+| `cache_coherency` | 多核心下，各自的 cache 如何維持資料一致 |
+| `memory_model` | 記憶體操作在多核心下的可見順序保證 |
+
+---
+
+# Theory
+
+`multithreading` 是共同先備知識——先理解多執行緒為什麼會出問題，才能理解 `synchronization` 解決的是什麼問題。`cache_coherency` 跟 `synchronization` 是平行的兩個子問題（前者是硬體層次「資料值一致」，後者是軟體層次「操作順序協調」），`memory_model` 則站在兩者之上,定義「什麼順序保證是程式設計者可以依賴的」。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `synchronization`、`cache_coherency` 展開依賴到 `multithreading`；`memory_model` 展開到 `multithreading`、`synchronization`。
+3. 問題若牽涉「為什麼多執行緒平行化沒有帶來預期的效能提升」，額外參考 `performance/amdahls_law`，由上層 router 判斷跨 sub-domain 依賴。
+
+---
+
+# Example
+
+```
+問題：為什麼多執行緒程式需要 lock？
+直接對應: synchronization
+Requires 展開: multithreading
+最終載入: multithreading, synchronization
+```
+
+---
+
+# Common Mistakes
+
+- 把 `cache_coherency`（硬體自動維持多核心 cache 資料一致）跟 `synchronization`（軟體協調操作順序）混為一談——即使 cache coherency 完美運作，沒有適當同步機制的多執行緒程式仍然可能有 race condition，兩者解決的是不同層次的問題。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`parallel` router 判斷多執行緒/同步/cache 一致性/記憶體模型相關問題該載入的 Topic Skill，`multithreading` 是共同先備知識，`cache_coherency` 與 `synchronization` 是硬體/軟體兩個不同層次的並行子問題。

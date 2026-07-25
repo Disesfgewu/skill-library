@@ -1,0 +1,91 @@
+# Metadata
+
+Name: cache_coherency
+Category: computer_architecture/parallel
+Tags: [cache-coherency, mesi, multicore, snooping]
+Dependencies: [multithreading]
+Related Skills: [synchronization, cache/cache]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`synchronization` 解決的是「軟體邏輯上,操作順序有沒有被正確協調」；Cache Coherency 解決的是完全不同層次、純硬體的問題：多核心處理器中，每個核心通常都有自己**私有**的 L1（甚至 L2）cache（見 `cache/cache`），如果核心 A 修改了某個位址的值，只更新了 A 自己的 cache，核心 B 的 cache 裡還留著這個位址的舊值——B 讀到的會是過時的資料。Cache Coherency 機制確保這種情況不會發生。
+
+---
+
+# Concepts
+
+- **Cache Coherency（快取一致性）**：保證系統中所有核心對「同一個記憶體位址」看到的值，在任何時間點都是一致的（不會有核心讀到過時的舊值）。
+- **Snooping（窺探）**：一種常見實作方式，每個核心的 cache controller 持續監聽（snoop）匯流排（bus）上其他核心的記憶體操作，一旦發現有其他核心寫入了自己也存有副本的位址，就採取行動（讓自己的副本失效或更新）。
+- **MESI Protocol**：一種常見的 cache coherency 協定，把每個 cache line 標記為四種狀態之一：
+  - **M（Modified）**：這個核心獨佔且已修改，跟主記憶體不一致（是最新版本）。
+  - **E（Exclusive）**：這個核心獨佔，但跟主記憶體一致（尚未修改）。
+  - **S（Shared）**：多個核心都有這個 cache line 的副本，且跟主記憶體一致。
+  - **I（Invalid）**：這個副本無效，不能使用。
+
+---
+
+# Theory
+
+## 為什麼「一致性」跟「同步」是不同層次的問題
+
+Cache Coherency 保證的是「值的正確性」——只要某個核心讀取一個位址，讀到的一定是最新寫入的值,不會有硬體層面的「看到舊資料」問題。但它**完全不保證**「操作發生的順序」在程式邏輯上是否合理——即使 cache coherency 完美運作，`multithreading.skill` 描述的 `counter++` race condition 依然會發生，因為那個問題的根源是「讀取-修改-寫回」這個**軟體邏輯上的操作序列**被交錯執行，不是任何一個核心讀到了過時的資料值。這正是為什麼多核心系統**同時**需要 cache coherency（硬體保證值正確）**與** synchronization（軟體保證操作順序協調）——兩者解決不同層次的問題，缺一不可。
+
+## MESI 狀態轉換的核心邏輯
+
+MESI 協定的關鍵規則：一個 cache line 若處於 M 或 E 狀態（該核心獨佔），代表系統中**沒有其他核心**持有這個位址的有效副本，這個核心可以放心讀寫,不需要通知任何人；一旦另一個核心也想讀取這個位址，持有 M/E 狀態的核心必須（透過 snooping 偵測到這次請求）把自己的狀態降級為 S，且若原本是 M（跟主記憶體不一致），必須先把最新值寫回（write-back）或直接轉發給請求的核心，確保對方拿到的是最新值。任何核心要**寫入**一個處於 S 狀態的 cache line 前，必須先通知（透過匯流排廣播）其他持有相同位址副本的核心把各自的副本標記為 I（無效化，invalidate），確保寫入後不會有其他核心繼續讀到即將過時的舊值。
+
+---
+
+# Hardware
+
+MESI 狀態轉換示意（簡化，僅示範核心 A 寫入一個原本 Shared 的位址）：
+```
+初始狀態：核心 A 與核心 B 的 cache 都持有位址 X 的副本，狀態皆為 S（Shared）
+
+核心 A 要寫入 X:
+  1. A 透過匯流排廣播「我要寫入 X」的 invalidate 訊號
+  2. B 的 cache controller snoop 到這個訊號，把自己持有的 X 副本狀態改為 I（無效）
+  3. A 完成寫入，把自己的 X 狀態改為 M（Modified，獨佔且已修改）
+
+之後若核心 B 再次讀取 X:
+  1. B 發現自己的副本是 I（無效），必須重新請求
+  2. A snoop 到這次請求，發現自己是 M 狀態（比主記憶體新），把最新值提供給 B
+  3. A、B 的狀態都變成 S（Shared，一致且都是有效副本）
+```
+
+---
+
+# Software
+
+（不適用 — Cache coherency 是純硬體機制，對執行在其上的軟體透明；軟體只需要透過 `synchronization` 機制正確協調操作順序，不需要、也無法直接控制 cache coherency 協定本身的行為）
+
+---
+
+# Example
+
+延續 `multithreading.skill` 的 `counter++` 範例：即使系統有完美的 cache coherency（保證核心 A、B 對 counter 這個位址讀到的值永遠一致，不會有誰讀到過時資料），`counter++` 的 race condition 依然會發生——因為問題不在「讀到舊值」，而在「A、B 各自完成的『讀取-加一-寫回』三個步驟，被交錯執行、其中一次的寫入結果被另一次覆蓋」，這是操作順序的協調問題，需要 `synchronization`（例如把整個 `counter++` 包在一個 lock 裡）才能解決，cache coherency 對此無能為力。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「系統有 cache coherency 保護，多執行緒程式就不會有 race condition」，這正是上方 Example 具體反駁的常見誤解——cache coherency 只保證「值是最新的」，不保證「多個操作步驟的執行順序是安全的」，這是兩個完全不同層次的問題，可以透過「即使假設 cache coherency 完美運作，`counter++` 的三步驟交錯執行問題依然邏輯上存在」這個思想實驗驗證。
+- 把 MESI 的 Invalid 狀態誤解為「這個 cache line 被清空、不佔用空間了」——Invalid 只代表這個副本的**內容**不可信任、不能被讀取使用，硬體上這個 cache line 的空間仍然存在，只是需要重新從別處（其他核心或主記憶體）取得有效資料才能再次使用。
+
+---
+
+# Interview Questions
+
+- 為什麼「系統有 cache coherency」不代表「多執行緒程式沒有 race condition」？
+- MESI 協定中，一個核心要寫入一個處於 Shared 狀態的 cache line 前，為什麼必須先廣播 invalidate 訊號？
+
+延伸思考：Snooping 協定要求每個核心監聽匯流排上**所有**其他核心的記憶體操作，這個做法隨核心數量增加會遇到什麼擴展性（scalability）問題？（提示：想想匯流排本身的頻寬是否會成為瓶頸，這是大型多核心/多處理器系統改用其他一致性機制，例如 directory-based coherency，的動機）
+
+---
+
+# Summary
+
+Cache Coherency（如 MESI 協定）是純硬體機制，透過 snooping 與狀態機（M/E/S/I）保證多核心對同一位址讀到的值永遠一致，解決的是「值的正確性」；它跟 `synchronization` 解決的是完全不同層次的問題（前者硬體保證資料值、後者軟體協調操作順序），即使 cache coherency 完美，race condition 依然可能發生，兩者缺一不可。

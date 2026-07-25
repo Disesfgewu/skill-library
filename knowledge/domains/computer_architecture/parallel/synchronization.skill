@@ -1,0 +1,101 @@
+# Metadata
+
+Name: synchronization
+Category: computer_architecture/parallel
+Tags: [synchronization, lock, atomic, mutex, amoswap]
+Dependencies: [multithreading]
+Related Skills: [memory_model]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`multithreading` 說明 race condition 的根源是「非原子操作被交錯執行」。Synchronization 機制正是要解決這個問題：提供某種方式，確保一段程式碼（critical section）在同一時間只被一個執行緒執行，或者提供真正的原子操作，讓 `multithreading` 描述的「讀取-修改-寫回」三步驟不會被其他執行緒插入。
+
+---
+
+# Concepts
+
+- **Lock（鎖）/ Mutex（Mutual Exclusion，互斥鎖）**：軟體層次的機制，一個執行緒進入 critical section 前必須先取得 lock，其他執行緒必須等待直到 lock 被釋放。
+- **Atomic Instruction（原子指令）**：硬體提供的、保證「讀取-修改-寫回」不會被其他核心的操作插入的特殊指令，是實作 lock 的底層基礎。
+- **RISC-V 的 `amoswap`（Atomic Memory Operation - Swap）**：RISC-V A extension 提供的原子指令之一，原子地交換暫存器與記憶體中的值，可以用來實作簡單的 lock。
+
+---
+
+# Theory
+
+## 為什麼 Lock 本身也需要硬體原子操作才能正確實作
+
+這是一個常被忽略、但邏輯上必然的問題：如果 Lock 本身用「讀取 lock 狀態 → 判斷是否可用 → 設定 lock 為已佔用」這種**非原子**的方式實作，那 Lock 自己就會有 race condition（兩個執行緒可能同時讀到「lock 可用」，都認為自己成功取得了鎖）——等於用一個有 bug 的機制去解決另一個 bug。因此 Lock 的實作**必須**建立在硬體提供的原子指令之上：例如用 `amoswap` 把「讀取目前 lock 值、同時把 lock 設為 1（佔用）」這整個動作做成硬體保證不可分割的單一操作，這樣才能確保「只有一個執行緒能把 lock 從 0 變成 1」。
+
+## Spinlock 的取捨
+
+用原子指令實作的最簡單 lock 叫 spinlock：拿不到鎖的執行緒**忙碌等待**（不斷重複嘗試原子操作），直到成功為止。優點是實作簡單、延遲低（一旦鎖釋放，等待的執行緒能立刻偵測到）；缺點是等待期間持續佔用 CPU（不像作業系統層次的 lock，等待的執行緒可以被切換出去，讓 CPU 執行別的工作）。這是效能與資源使用的具體取捨：critical section 很短時 spinlock 通常更划算（避免執行緒切換的開銷）；critical section 較長時，讓等待的執行緒讓出 CPU 通常更划算。
+
+---
+
+# Hardware
+
+`amoswap` 的行為（概念示意，原子地完成以下三步，中間不會被其他核心的記憶體操作插入）：
+```
+atomic {
+    temp = Memory[address]      # 讀取記憶體目前的值
+    Memory[address] = register  # 把暫存器的值寫入記憶體
+    register = temp             # 把讀到的舊值放回暫存器
+}
+```
+
+---
+
+# Software
+
+用 `amoswap` 實作 spinlock（概念示意）：
+```
+acquire_lock:
+    li   t0, 1              # t0 = 1（代表「佔用」狀態）
+retry:
+    amoswap.w t1, t0, (lock_addr)  # 原子交換：讀出 lock 目前值到 t1，同時把 lock 設為 1
+    bnez t1, retry            # 若 t1 != 0，代表鎖原本就是佔用狀態，繼續重試（spin）
+    # 若 t1 == 0，代表鎖原本是空閒，這次成功取得鎖，繼續往下執行
+
+release_lock:
+    sw   x0, (lock_addr)      # 把 lock 設回 0（空閒）
+```
+這裡的關鍵是 `amoswap` 保證「讀出舊值」跟「寫入新值」是同一個不可分割的硬體操作——即使兩個執行緒同時執行 `amoswap`，硬體保證兩次操作有先後順序（不會同時讀到同一個舊值），只有先執行的那個會讀到 0（成功取鎖），後執行的會讀到剛被改成的 1（繼續重試）。
+
+---
+
+# Example
+
+如果沒有原子指令，用「一般的 load + 一般的 store」試圖實作同樣的 lock：
+```
+acquire_lock (錯誤示範，非原子):
+    lw   t1, (lock_addr)     # 讀取 lock
+    bnez t1, acquire_lock     # 若已佔用，重試
+    li   t0, 1
+    sw   t0, (lock_addr)      # 設為佔用
+```
+這段程式碼有 race condition：兩個執行緒可能都在同一時刻各自執行完 `lw`（都讀到 0，都認為鎖是空的），然後都各自執行 `sw`（都認為自己成功取得了鎖）——這正是 `lw`+`sw` 之間存在一個「空隙」，其他執行緒可能在這個空隙插入操作，跟 `multithreading.skill` 描述的 `counter++` race condition 是完全同構的問題，只是這裡出錯的是 lock 機制本身。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「用一般的 load 檢查、確認沒問題後再用一般的 store 設定，就能實作出正確的 lock」，上方 Example 已經具體證明這是錯的——`lw` 跟 `sw` 之間存在一個時間窗口，其他執行緒可以在這個窗口插入操作，導致兩個執行緒都誤以為自己成功取鎖；正確做法必須用硬體保證原子性的指令（如 `amoswap`），把「檢查」與「設定」變成單一、不可分割的操作。
+- 把 Spinlock（忙碌等待）當成唯一或永遠正確的 lock 實作方式——當 critical section 執行時間較長時，spinlock 讓等待的執行緒持續空轉消耗 CPU，通常不如讓作業系統把等待的執行緒切換出去（見作業系統層次的 mutex/semaphore 實作，屬於超出本 sub-domain 範圍的作業系統主題）。
+
+---
+
+# Interview Questions
+
+- 為什麼 Lock 本身的實作一定需要硬體提供的原子指令，不能只靠一般的 load/store 組合？
+- Spinlock 相對於「讓執行緒讓出 CPU 等待」的 lock 實作，各自適合什麼情境？
+
+延伸思考：如果 RISC-V 沒有 `amoswap` 這類原子指令，是否有辦法只用一般指令（load、store、branch）實作出正確的 lock？（提示：這是電腦科學史上真實被研究過的問題，關鍵字是 Peterson's Algorithm——可以自己查證這類演算法為什麼在單純的 load/store 語意下仍然能保證正確性，以及它們的實務限制是什麼）
+
+---
+
+# Summary
+
+Synchronization 用 Lock/Mutex 保護 critical section，但 Lock 本身的正確實作依賴硬體提供的原子指令（如 RISC-V 的 `amoswap`）——「檢查再設定」若用一般 load/store 組合會有 race condition，必須是硬體保證不可分割的單一操作；Spinlock 是最簡單的實作，忙碌等待換取低延遲，是否划算取決於 critical section 的長短。

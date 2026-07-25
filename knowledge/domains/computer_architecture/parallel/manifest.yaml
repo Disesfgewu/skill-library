@@ -1,0 +1,23 @@
+multithreading:
+  requires: []
+  optional: []
+  # cross-folder: performance/amdahls_law (parallel speedup limits)
+
+synchronization:
+  requires:
+    - multithreading
+  optional: []
+
+cache_coherency:
+  requires:
+    - multithreading
+  optional:
+    - synchronization
+  # cross-folder: cache/cache
+
+memory_model:
+  requires:
+    - multithreading
+    - synchronization
+  optional:
+    - cache_coherency

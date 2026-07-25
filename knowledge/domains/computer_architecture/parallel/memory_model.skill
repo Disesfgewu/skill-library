@@ -1,0 +1,91 @@
+# Metadata
+
+Name: memory_model
+Category: computer_architecture/parallel
+Tags: [memory-model, reordering, memory-barrier, sequential-consistency]
+Dependencies: [multithreading, synchronization]
+Related Skills: [cache_coherency]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`cache_coherency` 保證多核心對同一個位址讀到的值一致，但完全沒有規定：一個核心對**不同位址**的多個寫入操作，其他核心觀察到的**順序**是否跟程式碼寫的順序一致。這正是 Memory Model（記憶體模型）要定義的：它是硬體對「跨核心觀察記憶體操作順序」給出的正式保證，是撰寫正確多執行緒程式時最容易被忽略、卻可能導致最詭異 bug 的知識。
+
+---
+
+# Concepts
+
+- **Sequential Consistency（循序一致性）**：最直覺、最嚴格的記憶體模型——所有核心觀察到的記憶體操作順序，就像所有指令被交錯合併成單一一條全域順序，且每個核心自己的操作在這條全域順序中維持程式碼寫的相對順序。
+- **Reordering（順序重排）**：為了效能，硬體（或編譯器）可能改變記憶體操作實際執行的順序，只要不影響**單一執行緒自己觀察到的結果**（這叫 program order 內部一致），但其他執行緒透過共用記憶體觀察到的順序可能被打亂。
+- **Memory Barrier / Fence（記憶體屏障）**：一種特殊指令，強制要求屏障之前的記憶體操作，必須在屏障之後的記憶體操作之前，對其他核心變得可見。
+
+---
+
+# Theory
+
+## 為什麼硬體要允許 Reordering（打破直覺的循序一致性）
+
+若嚴格要求 Sequential Consistency，硬體（與編譯器）必須放棄大量效能最佳化手段：例如不能把兩個沒有資料相依的 store 重排執行順序、不能讓 store 在寫入 cache 前先進 store buffer 非同步處理。這些最佳化在**單執行緒**程式中完全不會造成問題（因為單一執行緒觀察自己的操作，永遠是依照它發出的順序,這是硬體對單執行緒的基本保證），但在**多執行緒**、透過共用記憶體溝通時，其他核心可能透過另一個變數,觀察到這些被重排的操作以「不符合原始程式碼順序」的方式出現——這正是多核心處理器普遍採用比 Sequential Consistency 更寬鬆的記憶體模型（例如 Total Store Order、或更寬鬆的 Relaxed models）的效能理由。
+
+## 一個經典的 Reordering 問題
+
+```
+初始狀態: flag = 0, data = 0
+
+核心 A 執行:               核心 B 執行:
+data = 42;                 while (flag == 0) { }   // 等待 flag 變成 1
+flag = 1;                  print(data);
+```
+直覺上（依循序一致性）：核心 B 看到 `flag == 1` 之後，`data` 一定已經是 42（因為程式碼寫的順序是先設 data、後設 flag）。但如果硬體允許 reordering，核心 A 對 `data`、`flag` 這兩個**不同位址**的寫入，可能被硬體（或編譯器）重排成先寫 `flag` 再寫 `data`——核心 B 完全可能在看到 `flag == 1` 的當下,`data` 卻還是舊值 0，印出錯誤的結果。這個問題**不是** race condition（`multithreading.skill` 定義的「同一位址被交錯讀寫」），而是記憶體模型的順序保證問題——是完全不同類別的多執行緒 bug。
+
+## Memory Barrier 如何解決這個問題
+
+在核心 A 的兩行程式碼之間插入一個 memory barrier，強制要求「`data = 42` 這個寫入，必須在 `flag = 1` 這個寫入對其他核心可見之前，先對其他核心可見」——這樣核心 B 只要觀察到 `flag == 1`，就能保證 `data` 已經是 42。`synchronization.skill` 描述的原子指令（如 `amoswap`）與 lock 的正確實作，通常隱含了必要的 memory barrier，這也是為什麼「用 lock 保護共用資料」除了解決 race condition，同時也順帶解決了記憶體模型的順序問題——這是 lock 提供的兩種不同保證被綁在一起的具體體現。
+
+---
+
+# Hardware
+
+（見上方 Theory 段的核心 A/B 範例；memory barrier 的具體硬體實作方式因架構而異，此處僅說明其效果與必要性，不展開特定微架構細節）
+
+---
+
+# Software
+
+RISC-V 提供 `fence` 指令作為 memory barrier：
+```
+    sw   x1, data          # data = 42
+    fence rw, rw            # 屏障：確保上面的寫入，在下面的操作對其他核心可見之前先可見
+    li   t0, 1
+    sw   t0, flag           # flag = 1
+```
+
+---
+
+# Example
+
+延續上方 Theory 段的「flag/data」範例：若核心 A 在兩次寫入之間插入 `fence`，核心 B 觀察到 `flag == 1` 時，`fence` 保證了 `data = 42` 這個寫入已經先對核心 B 可見——這解決了 reordering 問題，跟解決 `counter++` race condition 需要的 lock 是不同的機制（雖然實務上 lock 內部往往也包含類似 fence 的效果）。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「只要沒有兩個執行緒同時寫同一個變數，就不會有多執行緒的記憶體問題」，這個直覺只考慮了 race condition（`multithreading.skill` 定義的、針對**同一位址**的問題），完全忽略了上方 Theory 段展示的 reordering 問題——那個範例中，核心 A、B 各自只寫/讀了各自負責的變數（A 寫 `data`、`flag`，B 讀 `flag`、`data`），沒有任何一個位址被兩個核心同時寫入,卻仍然可能因為 reordering 而觀察到錯誤的順序，可以透過在有寬鬆記憶體模型的硬體上實際執行這段程式碼、統計是否出現 `data` 仍是 0 的情況來驗證這個問題確實存在。
+- 把「同步（synchronization）解決了 race condition」跟「記憶體模型的順序保證」當成同一件事——雖然正確使用的 lock 通常隱含了必要的 memory barrier（見 Theory 段），但這是兩個概念上獨立的保證，理解記憶體模型不能只靠「反正用了 lock 就沒事」這種簡化認知，尤其在需要手寫 lock-free 演算法（不用 lock、直接用原子指令與 fence）的情境下，必須直接、精確地理解記憶體模型本身。
+
+---
+
+# Interview Questions
+
+- 為什麼硬體允許記憶體操作 reordering，而不是永遠遵守嚴格的 Sequential Consistency？
+- Reordering 導致的 bug（例如 flag/data 範例）跟 `multithreading.skill` 定義的 race condition，本質上有什麼不同？
+
+延伸思考：如果一段程式碼完全沒有共用變數的寫入衝突（不會有傳統定義的 race condition），是否代表它在任何硬體上都能正確地跨執行緒溝通？結合本 skill 的討論,你會怎麼向一個只學過 `synchronization.skill` 但沒學過記憶體模型的人，解釋為什麼答案是否定的？
+
+---
+
+# Summary
+
+Memory Model 定義硬體對「跨核心觀察記憶體操作順序」的保證；為了效能，現代硬體通常允許比嚴格 Sequential Consistency 更寬鬆的 reordering，這會在沒有任何傳統 race condition（同位址讀寫衝突）的情況下，仍然導致跨執行緒溝通出錯（如 flag/data 範例）；Memory Barrier/Fence 指令強制規定操作對其他核心可見的順序，正確使用的 lock 通常隱含必要的 barrier，但記憶體模型本身是獨立於 race condition 的另一層問題，寫 lock-free 程式碼時必須直接理解它。
