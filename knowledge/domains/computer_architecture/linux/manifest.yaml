@@ -1,0 +1,14 @@
+io_devices:
+  requires: []
+  optional: []
+
+interrupts:
+  requires:
+    - io_devices
+  optional: []
+
+trap_handling:
+  requires:
+    - interrupts
+  optional: []
+  # cross-folder: virtual_memory/page_table (page fault is a trap)

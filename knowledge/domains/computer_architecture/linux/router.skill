@@ -1,0 +1,77 @@
+# Metadata
+
+Name: linux-router
+Category: router
+Tags: [router, io, interrupts, trap, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/jserv_style]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷歸類到 `computer_architecture/linux` 這個 sub-domain 的問題，需要載入哪些 Topic Skills。本身不回答問題內容。
+
+**重要區分**：這個 sub-domain 對應 NCKU 課程大綱中「Linux Interaction」這個單元，範圍是**處理器硬體與作業系統之間的介面**（I/O、中斷、trap handling）——這是 computer architecture 課程視角下「軟硬體交界處」的內容，**不等於**完整的 Linux 核心設計（那屬於 `knowledge/router.skill` 頂層列出的、獨立的 `domains/linux/` domain，目前尚未建立）。若問題是在問 Linux 核心的排程器、檔案系統、記憶體管理子系統等完整核心主題，應由 Global Router 導向 `domains/linux/`，而非這裡。
+
+---
+
+# Concepts
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `io_devices` | I/O 裝置的基本存取方式：memory-mapped I/O、polling |
+| `interrupts` | 中斷驅動 I/O，相對 polling 的取捨 |
+| `trap_handling` | Pipeline 中如何處理例外/中斷（含 page fault 這類同步例外） |
+
+---
+
+# Theory
+
+`io_devices` 是先備知識（要先懂裝置怎麼被存取，才懂 polling 在等什麼）；`interrupts` 是 polling 的替代方案，需要先理解 polling 的缺點才能理解中斷解決了什麼；`trap_handling` 則是更底層、pipeline 硬體層次的問題——不管是中斷（外部觸發）還是例外（程式執行中觸發，例如 page fault），都需要一套機制暫停正常執行、跳去處理、再正確恢復。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 對照上表關鍵字比對。
+2. `interrupts` 展開依賴到 `io_devices`；`trap_handling` 展開到 `interrupts`（進而 `io_devices`）。
+3. 問題若牽涉「page fault 怎麼觸發」，同時參考 `virtual_memory/page_table`，由上層 router 判斷跨 sub-domain 依賴。
+
+---
+
+# Example
+
+```
+問題：Pipeline 裡中斷是怎麼被處理的？
+直接對應: trap_handling
+Requires 展開: interrupts, io_devices
+最終載入: io_devices, interrupts, trap_handling
+```
+
+---
+
+# Common Mistakes
+
+- 把這個 sub-domain 的範圍誤認為「完整的 Linux 作業系統知識」——這裡只涵蓋處理器硬體視角的 I/O/中斷/trap，跟作業系統本身的排程、行程管理等主題是不同 domain。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+`computer_architecture/linux` router 判斷 I/O 裝置存取/中斷/trap handling 相關問題該載入的 Topic Skill；範圍限定在處理器硬體與作業系統的介面，不涵蓋完整 Linux 核心設計（那是獨立、尚未建立的頂層 `linux` domain）。

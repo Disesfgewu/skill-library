@@ -1,0 +1,103 @@
+# Metadata
+
+Name: trap_handling
+Category: computer_architecture/linux
+Tags: [trap, exception, interrupt-handling, pipeline, page-fault]
+Dependencies: [interrupts]
+Related Skills: [virtual_memory/page_table, pipeline/speculation]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`interrupts` 說明中斷是「外部裝置」觸發的非同步事件；但還有另一大類事件——**例外（Exception）**——是處理器**執行指令的過程中自己觸發**的，例如 `virtual_memory/page_table` 描述的 Page Fault、除以零、非法指令。這個 skill 用統一的框架「Trap」涵蓋中斷與例外兩者,說明 `pipeline_overview` 描述的 5-stage pipeline 具體怎麼處理這類會打斷正常執行流程的事件。
+
+---
+
+# Concepts
+
+- **Trap（陷入）**：中斷（Interrupt）與例外（Exception）的統稱——任何會讓處理器偏離正常依序執行、轉去執行特定處理程式碼的事件。
+- **Interrupt（中斷）**：非同步、由外部事件觸發（見 `interrupts`）,跟目前執行到哪條指令無關。
+- **Exception（例外）**：同步、由**目前正在執行的指令本身**觸發（例如 Page Fault、除以零、非法 opcode），一定跟某條特定指令綁定。
+- **Precise Exception（精確例外）**：要求處理器能明確回答「例外發生時，執行到底停在哪一條指令」——在觸發例外的那條指令**之前**的所有指令都必須已完整執行完畢，該指令**之後**的所有指令都必須完全沒有執行任何會影響架構狀態的動作。
+
+---
+
+# Theory
+
+## 為什麼 Pipeline 讓「精確例外」變成一個真正的硬體難題
+
+在 `pipeline_overview` 描述的重疊執行下，同一個時刻，可能有一條指令在 WB（幾乎已完成）、另一條在 MEM、另一條在 EX、另一條在 ID、另一條在 IF（剛開始）——如果 EX 階段的那條指令觸發了例外（例如除以零），此時**在它之後**進入 pipeline 的指令（ID、IF 階段那兩條）可能都還沒真正修改任何架構狀態，可以直接作廢（做法完全同 `pipeline/speculation.skill` 描述的 flush 機制）；但**在它之前**的指令（MEM、WB 階段那兩條）可能已經部分或完全修改了架構狀態——這些必須被允許完整跑完,不能被中途打斷,否則會留下「一部分修改了、一部分沒修改」的不一致狀態。硬體必須確保：例外發生後,只有觸發例外的那條指令**之前**的效果生效,之後的效果全部不生效,即使它們在時間上其實已經部分執行到 pipeline 的某個階段——這正是「重疊執行」與「例外必須看起來像單一、乾淨的中斷點」這兩個需求之間的張力，也是為什麼 `trap_handling` 是計算機結構課程公認較困難的主題之一。
+
+## 為什麼 Page Fault 必須是精確例外
+
+`virtual_memory/page_table` 描述 Page Fault 處理完後，要「重新執行」觸發它的那條指令。這個機制**必須**建立在精確例外之上：作業系統的 page fault handler 需要確切知道是哪一條指令、在什麼架構狀態下觸發了 fault，才能正確地載入分頁後、把 PC 精確地設回那條指令重新執行。如果例外不精確（例如硬體只能回報「大概在這附近的某條指令」），page fault 的處理完全無法正確運作——這說明了「精確例外」不是錦上添花的優化，而是 `virtual_memory` 整套機制能正確運作的必要前提。
+
+## Trap Handling 的一般流程
+
+1. 偵測到 trap（中斷訊號、或指令執行中偵測到例外條件）。
+2. 硬體自動保存足夠恢復執行所需的最少狀態（至少包含：PC、處理器狀態暫存器）到特殊暫存器（RISC-V 中例如 `mepc`：保存觸發 trap 時的 PC）。
+3. Flush 掉 pipeline 中所有「不該生效」的指令（做法同 `pipeline/speculation` 的清空機制）。
+4. PC 跳到 trap handler（作業系統或韌體提供的處理程式碼）。
+5. Trap handler 判斷 trap 類型、實際處理（例如 page fault handler 載入分頁、中斷 ISR 讀取裝置資料）。
+6. 處理完成，用專門指令（RISC-V 的 `mret`）恢復保存的狀態、跳回原本該執行的位置——對中斷而言是**下一條**指令（原本被打斷的指令本身完全沒受影響）；對例外（如 Page Fault）而言,通常是**重新執行**觸發例外的那條指令本身。
+
+---
+
+# Hardware
+
+Trap 發生時 pipeline 的處理示意（假設某條指令在 EX 階段觸發例外）：
+```
+Cycle:              1    2    3    4    5
+指令 i-1（正常）:    IF   ID   EX   MEM  WB   <- 允許完整執行完畢
+指令 i（觸發例外）:        IF   ID   EX*  --   --   <- EX 偵測到例外，本身及之後階段被清空
+指令 i+1:                       IF   ID*             <- 清空（同 pipeline/bubble 的做法）
+指令 i+2:                            IF*             <- 清空
+trap handler:                             IF   ID  ...  <- PC 跳到 trap handler，重新開始抓取
+```
+
+---
+
+# Software
+
+RISC-V trap 處理涉及的關鍵暫存器（Machine mode，概念示意）：
+```
+mepc    : 保存 trap 發生時的 PC（例外：觸發例外那條指令的位址；中斷：適當的返回點）
+mcause  : 記錄 trap 的原因（區分是哪一種中斷或例外）
+mstatus : 保存/恢復處理器狀態（例如中斷是否啟用）
+mtvec   : 指向 trap handler 的位址（處理器發現 trap 就跳到這裡）
+
+trap handler 結尾用 mret 指令：
+  PC <- mepc
+  恢復 mstatus 中保存的狀態
+  繼續正常執行
+```
+
+---
+
+# Example
+
+一條 `lw x1, 0(x2)` 若因為 `x2` 存的位址觸發 Page Fault：這條指令在 EX 階段算出位址後、MEM 階段實際存取時偵測到 valid bit 為 0，觸發例外。硬體把 `mepc` 設為這條 `lw` 指令的位址，清空 pipeline 中在它之後的指令，跳到 page fault handler；handler 載入正確分頁、更新 page table 後，執行 `mret`，PC 回到 `mepc`（也就是**同一條** `lw` 指令），重新執行——這次因為分頁已經有效，`lw` 能正常完成，程式完全感覺不到中間發生過 page fault（除了多花了一些時間）。
+
+---
+
+# Common Mistakes
+
+- 如果你認為「Pipeline 中一旦有指令觸發例外，最簡單的做法是把整個 pipeline 目前所有指令都清空、包含比它更早進入 pipeline 的指令」，這個做法會嚴重錯誤——見 Theory 段：在觸發例外的指令**之前**進入 pipeline 的指令，必須被允許完整執行完畢（它們沒有問題，是合法、已經確定要生效的結果），只有它**之後**的指令才需要被清空；清空範圍算錯，會讓已經合法完成的操作被錯誤地作廢，或讓不該生效的操作意外生效。
+- 把中斷與例外的返回位址處理方式混為一談——中斷處理完通常返回**下一條**指令（原本要執行的那條完全沒開始，不受影響），例外（尤其像 Page Fault 這種可修復的）處理完通常要**重新執行同一條**觸發例外的指令，兩者的 `mepc` 語意與後續 `mret` 的效果不同,需要 trap handler 依 `mcause` 判斷正確處理方式。
+
+---
+
+# Interview Questions
+
+- 為什麼 Pipeline 化的處理器要正確處理精確例外，會比單週期處理器困難得多？
+- 為什麼 Page Fault 處理完後是「重新執行同一條指令」，而中斷處理完後通常是「繼續執行下一條指令」？
+
+延伸思考：`pipeline/speculation.skill` 描述的分支預測錯誤清空（flush），跟本 skill 描述的例外清空，在硬體機制上有什麼相似之處？兩者「決定該清空哪些指令」的判斷依據，分別是什麼？
+
+---
+
+# Summary
+
+Trap 統稱中斷（非同步、外部觸發）與例外（同步、由執行中的指令自己觸發，如 Page Fault）；Pipeline 化處理器要正確支援精確例外，必須確保觸發點之前的指令完整生效、之後的指令完全不生效（清空機制同 `pipeline/speculation`）；精確例外是 `virtual_memory` 的 page fault 恢復機制能正確運作的必要前提；中斷通常返回下一條指令，可修復的例外（如 Page Fault）通常重新執行觸發它的同一條指令，兩者處理邏輯不同。
