@@ -1,0 +1,103 @@
+# Metadata
+
+Name: pipeline-router
+Category: router
+Tags: [router, pipeline, topic-classification]
+Dependencies: []
+Related Skills: [shared/teaching, shared/reasoning, shared/diagram]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷一個已經被 Domain Router 歸類到 `pipeline` 這個 sub-domain 的問題，實際需要載入哪些 Topic Skills，並依 `manifest.yaml` 解析出完整的 `requires` 依賴鏈。本身不回答問題內容。
+
+---
+
+# Concepts
+
+`pipeline/` 底下有 8 個 Topic Skills：
+
+| Topic Skill | 涵蓋內容 |
+| --- | --- |
+| `pipeline_overview` | Pipeline 基本概念、5 個 stage、設計目的、優缺點 |
+| `pipeline_register` | Pipeline register（IF/ID、ID/EX、EX/MEM、MEM/WB）的功能 |
+| `pipeline_hazard` | Hazard 的分類：Structural、Data、Control |
+| `forwarding` | 用額外硬體路徑解決 data hazard |
+| `stall` | 插入等待週期解決 hazard（forwarding 無法解決時的後備手段） |
+| `bubble` | Stall 在時序圖上呈現為 pipeline bubble 的機制 |
+| `branch_prediction` | Static / Dynamic prediction、BTB、BHT、Two-bit predictor |
+| `speculation` | 依預測結果提前執行、預測錯誤時的 flush/recovery |
+
+---
+
+# Theory
+
+這 8 個 Topic Skills 之間有明顯的先備知識關係（見 `manifest.yaml`）：必須先懂 `pipeline_overview` 才懂 hazard 為什麼發生，必須先懂 hazard 分類才懂 forwarding/stall 是針對哪一種 hazard 的對策，必須先懂 stall 才懂 bubble 是 stall 在時序圖上的具體樣子，必須先懂 hazard（尤其 control hazard）才懂為什麼需要 branch prediction，必須先懂 branch prediction 才懂 speculation 是「預測之後真的提前執行」這一步。這個順序不是任意排列，而是概念上的必要前提。
+
+---
+
+# Hardware
+
+（不適用 — 本 skill 為路由邏輯，非知識性主題）
+
+---
+
+# Software
+
+## 判斷流程
+
+1. 讀取問題關鍵字，比對上方 Concepts 表格，找出問題直接對應的 Topic Skill（可能不只一個）。
+2. 查 `manifest.yaml` 對應項目的 `requires`，遞迴展開整條依賴鏈，全部載入（依賴鏈中每一項的 `requires` 也要展開）。
+3. 依問題深度判斷是否也載入 `optional` 項目：
+   - 問題只問「是什麼」→ 通常不需要 optional。
+   - 問題問「為什麼選 A 不選 B」「A 跟 B 有什麼差別」這種比較性問題 → 通常需要載入 optional 中對應的比較對象。
+4. 載入完成後，依 `shared/teaching.skill` 的 Why→How→Example→Summary 順序組織回答。
+
+---
+
+# Example
+
+```
+問題：Forwarding 是什麼？
+直接對應: forwarding
+Requires 展開: pipeline_overview, pipeline_hazard
+最終載入: pipeline_overview, pipeline_hazard, forwarding
+```
+
+```
+問題：為什麼有些 hazard forwarding 沒辦法解決，一定要 stall？
+直接對應: stall
+Requires 展開: pipeline_overview, pipeline_hazard
+Optional 判斷: 問題是比較性的（forwarding vs stall），載入 optional 的 forwarding
+最終載入: pipeline_overview, pipeline_hazard, forwarding, stall
+```
+
+```
+問題：Branch misprediction 的代價怎麼算？
+直接對應: speculation
+Requires 展開: pipeline_overview, pipeline_hazard, branch_prediction
+Optional 判斷: 問題牽涉「代價」，通常代價是用 bubble/stall 週期數表示，載入 optional 的 bubble
+最終載入: pipeline_overview, pipeline_hazard, branch_prediction, speculation, bubble
+```
+
+---
+
+# Common Mistakes
+
+- 只載入問題直接對應的 Topic Skill，沒有展開 `requires` 依賴鏈，導致回答缺少必要的背景概念。
+- 比較性問題沒有判斷出需要載入 optional 的比較對象。
+- 依賴鏈展開後沒有按照「先備知識在前」的順序組織回答（例如先解釋 forwarding 才解釋 pipeline_hazard，順序顛倒）。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+Pipeline Router 依 `manifest.yaml` 的 `requires`/`optional` 判斷需要載入的 Topic Skills 並展開完整依賴鏈，比較性問題額外載入 optional 的比較對象，本身不回答問題內容。

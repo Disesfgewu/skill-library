@@ -1,0 +1,76 @@
+# Metadata
+
+Name: citation
+Category: shared
+Tags: [citation, sources, academic-integrity]
+Dependencies: []
+Related Skills: [reasoning]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+規定 Knowledge Skills 回答時如何標示知識來源，讓讀者知道一個說法是「業界共識」「特定規格書規定」「特定教材觀點」還是「不同來源間有分歧」，避免把單一來源的說法當成唯一正確答案。
+
+---
+
+# Concepts
+
+回答中引用具體規則、數據、或有爭議的說法時，標示來源類別：
+
+- **教材**：例如 Patterson & Hennessy《Computer Organization and Design》、CS:APP。
+- **Paper**：學術論文（例如 branch predictor 的原始論文）。
+- **RFC**：網路協定相關（本 Domain 之後若擴充到 networking 會用到）。
+- **Manual**：廠商手冊，例如 Intel SDM、ARM Architecture Reference Manual。
+- **Specification**：正式規格，例如 RISC-V ISA Specification、ELF System V ABI。
+
+---
+
+# Theory
+
+計算機結構的知識有一部分是「跨架構通用的原理」（例如 forwarding 解決 data hazard 的原理），有一部分是「特定架構/廠商的具體規則」（例如 x86 的分支預測器實作細節、RISC-V 的指令編碼）。把兩者混在一起而不標明來源，會讓讀者誤以為某個廠商的實作細節是放諸四海皆準的原理，或反過來以為通用原理只適用於某一個架構。標示來源也讓「不同來源間存在分歧」這件事可以被誠實地呈現，而不是被回答者悄悄用其中一個觀點蓋過另一個。
+
+---
+
+# Hardware
+
+（不適用 — 本 skill 規範的是引用呈現方式）
+
+---
+
+# Software
+
+實作慣例：
+- 行內標示格式：`[來源類別: 具體名稱]`，例如 `[Specification: RISC-V ISA Manual]`、`[教材: Patterson & Hennessy]`。
+- 若多個來源對同一件事說法不同，需並列呈現差異，並註明各自來源，而不是任意選一個當作正確答案（見 Common Mistakes）。
+- 不逐字大量引用受版權保護教材原文；用自己的話重新解釋概念，僅在必要時標明「此結論參考自 [教材: X]」。
+
+---
+
+# Example
+
+**問題**：RISC-V 跟 x86 的分支預測器實作方式一樣嗎？
+
+正確引用方式：
+> 分支預測的通用原理（用歷史記錄預測跳轉方向）在各架構間是共通的 [教材: Patterson & Hennessy]。但具體的預測器結構（例如兩級自適應預測器的表格大小、tournament predictor 的組合方式）是各家 CPU 微架構的實作細節，RISC-V 規格本身 [Specification: RISC-V ISA Manual] 並不規定分支預測器要怎麼做，這完全是實作者（例如特定 RISC-V core 廠商）的設計選擇；x86 的實際做法則需參考 [Manual: Intel SDM] 或對應處理器世代的公開最佳化手冊 [其他: Agner Fog Optimization Manuals]，且不同世代處理器的做法也不同。
+
+---
+
+# Common Mistakes
+
+- 把某本教材的教學簡化模型當成「唯一正確」的硬體實作方式陳述。
+- 引用規格書內容時沒有標明是哪一份規格、哪一個版本。
+- 來源間有分歧時，只呈現其中一個觀點，沒有說明還有其他說法。
+
+---
+
+# Interview Questions
+
+- 為什麼「規格書規定的行為」跟「特定實作的行為」需要分開標示來源？
+
+---
+
+# Summary
+
+引用具體規則/數據時標示來源類別（教材/Paper/RFC/Manual/Specification）；來源間有分歧時並列呈現而非武斷選邊；不逐字大量引用受版權保護的教材原文。

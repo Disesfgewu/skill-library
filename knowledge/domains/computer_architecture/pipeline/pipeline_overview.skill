@@ -1,0 +1,84 @@
+# Metadata
+
+Name: pipeline_overview
+Category: computer_architecture/pipeline
+Tags: [pipeline, cpu-design, throughput, risc-v]
+Dependencies: []
+Related Skills: [pipeline_register, pipeline_hazard]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+單週期（single-cycle）處理器每個指令都要跑完最長的硬體路徑（通常是 load 指令：讀指令、讀暫存器、算位址、存取記憶體、寫回暫存器），導致所有指令都被最慢的那一種指令拖累，時脈頻率被迫壓得很低。Pipeline 存在的目的，就是讓多個指令的執行過程重疊起來，用重疊執行換取更高的指令吞吐量（throughput），而不需要真的把每個指令做得更快。
+
+---
+
+# Concepts
+
+RISC-V（以及大多數經典 RISC 設計）的教學用 5-stage pipeline，把一個指令的執行拆成 5 個獨立階段：
+
+1. **IF**（Instruction Fetch）：從指令記憶體讀出指令。
+2. **ID**（Instruction Decode / Register Fetch）：解碼指令、從暫存器檔讀出運算元。
+3. **EX**（Execute）：ALU 進行運算，或計算記憶體位址。
+4. **MEM**（Memory Access）：對資料記憶體做讀或寫（非 load/store 指令則跳過實際存取）。
+5. **WB**（Write Back）：把結果寫回暫存器檔。
+
+每個 stage 由對應的硬體單元負責（Instruction Memory、Register File、ALU、Data Memory），stage 之間用 **pipeline register** 隔開（見 `pipeline_register` skill），讓每個 stage 在同一個時脈週期可以處理「不同指令」的那個階段。
+
+---
+
+# Theory
+
+**Why 5 個 stage 而不是更多或更少？** 這是設計上的權衡：stage 切得越細（越多 stage），理論上每個週期可以縮得越短、時脈頻率可以拉得越高，但 pipeline register 的數量與 hazard 的複雜度也會增加（見 `pipeline_hazard`），且填滿/清空 pipeline 的額外週期比例也會上升。5-stage 是經典 RISC 設計（RISC-V 教學實作、MIPS）常見的折衷點：每個 stage 大致對應一個清楚的硬體功能單元，複雜度可控。
+
+**理論加速比**：在沒有 hazard、pipeline 已經填滿的穩態下，每個週期都能完成一個指令，理論吞吐量上限是單週期設計的「stage 數倍」（此處為 5 倍），詳細推導見 `shared/reasoning.skill` 的範例。但這是漸進上限（指令數量夠多時才成立），且前提是完全沒有 hazard 造成的停頓——實務上幾乎不可能，這正是 `pipeline_hazard`、`forwarding`、`stall` 存在的原因。
+
+---
+
+# Hardware
+
+5-stage pipeline 的資料流：
+
+```
+Cycle:      1    2    3    4    5    6    7
+I1:        IF   ID   EX   MEM  WB
+I2:             IF   ID   EX   MEM  WB
+I3:                  IF   ID   EX   MEM  WB
+I4:                       IF   ID   EX   MEM  WB
+```
+
+在第 5 個週期，I1 正在 WB、I2 正在 MEM、I3 正在 EX、I4 正在 ID、I5（圖未列出）正在 IF——5 個不同的指令同時佔用 5 個不同的硬體單元，這就是「重疊執行」的具體樣子。
+
+---
+
+# Software
+
+從指令集設計的角度，RISC-V 之所以適合這種 pipeline 設計，是因為它的指令格式規整（固定長度、少數幾種格式）、記憶體存取只透過 load/store 指令（load-store architecture），讓「哪個 stage 需要做什麼」在解碼前就大致可以預期，簡化了硬體設計。這也是 RISC（相對於 CISC）在教學上常被拿來當 pipeline 範例的原因之一 [教材: Patterson & Hennessy]。
+
+---
+
+# Example
+
+以 `add x1, x2, x3` 接著 `sub x4, x1, x5` 為例：I1（add）在週期 3 做 EX（計算 x2+x3），I2（sub）在週期 3 做 ID（讀 x1、x5）——此時 I1 的結果都還沒寫回暫存器，I2 卻已經要讀 x1，這就是 `pipeline_hazard` 要處理的情況，也是為什麼「重疊執行」不能只看熱鬧，還要處理重疊帶來的副作用。
+
+---
+
+# Common Mistakes
+
+- 以為 5-stage pipeline 讓「單一指令」變快了——實際上單一指令的延遲（latency）通常還略增加（因為多了 pipeline register 的額外延遲），變快的是吞吐量（throughput），不是單一指令的完成時間。
+- 忽略「填滿 pipeline」需要額外週期，把理論加速比直接當成任何指令數量下都成立的精確值。
+
+---
+
+# Interview Questions
+
+- 為什麼 pipeline 提升的是吞吐量而不是單一指令的延遲？
+- 如果把 5-stage pipeline 改成 10-stage，會有什麼優缺點？
+
+---
+
+# Summary
+
+Pipeline 讓多個指令的不同執行階段在同一週期重疊進行，用硬體重疊換取指令吞吐量，而非讓單一指令變快；5-stage 拆分（IF/ID/EX/MEM/WB）是常見的教學/RISC 設計折衷，重疊執行的代價是必須處理指令之間的相依性，也就是 hazard。

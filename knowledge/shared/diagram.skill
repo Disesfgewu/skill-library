@@ -1,0 +1,98 @@
+# Metadata
+
+Name: diagram
+Category: shared
+Tags: [diagram, visualization, ascii]
+Dependencies: []
+Related Skills: [teaching]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+規定 Knowledge Skills 在解釋結構性、時序性、或流程性概念時，優先用 ASCII diagram 呈現，而不是純文字描述，因為計算機結構的概念（datapath、pipeline timing、cache 結構、樹狀/圖狀結構）高度依賴空間關係，純文字很難讓讀者建立正確的心智模型。
+
+---
+
+# Concepts
+
+以下情境優先使用 ASCII diagram：
+
+- **CPU / Datapath**：暫存器、ALU、多工器、控制訊號之間的連線關係。
+- **Pipeline**：指令在時間軸上流過各個 stage 的時序圖（instruction vs. cycle 的表格式時序圖）。
+- **Cache**：address 如何切成 tag/index/offset；set/way 的排列。
+- **Tree / Graph**：階層關係（例如 memory hierarchy）、依賴關係（例如 manifest 的 requires graph）。
+
+---
+
+# Theory
+
+ASCII diagram 相較於純文字描述的優勢在於「同時呈現空間關係與時間關係」——例如 pipeline 時序圖同時編碼了「哪個指令」「在哪個 stage」「在哪個週期」三個維度，純文字必須逐句描述、讀者要在腦中重建這個表格，容易出錯或漏看。相較於外部圖片，ASCII diagram 可以直接嵌在文字回答中，不需要額外的渲染或檔案，且容易被複製、修改、在後續問答中重複引用。
+
+---
+
+# Hardware
+
+（不適用 — 本 skill 規範的是呈現方式）
+
+---
+
+# Software
+
+實作慣例：
+
+- Pipeline 時序圖固定用「指令為列、週期為欄」的表格：
+
+```
+Cycle:      1    2    3    4    5    6    7
+I1:        IF   ID   EX   MEM  WB
+I2:             IF   ID   EX   MEM  WB
+I3:                  IF   ID   EX   MEM  WB
+```
+
+- Datapath 圖固定用方框代表元件、線段代表資料/控制路徑，方向用箭頭：
+
+```
+        +--------+       +-----+
+PC ---->| Instr  |------>| ALU |----> Result
+        | Memory |  |    +-----+
+        +--------+  |       ^
+                     v       |
+                  +-----+    |
+                  | Reg |----+
+                  | File|
+                  +-----+
+```
+
+- Cache address 切分固定用長條圖標示 bit 範圍：
+
+```
+| Tag (t bits) | Index (s bits) | Offset (b bits) |
+```
+
+---
+
+# Example
+
+見上方 Software 段的三個範例圖，分別對應 pipeline 時序、datapath 連線、cache address 切分三種最常見的圖示情境。
+
+---
+
+# Common Mistakes
+
+- 該用圖的情境（例如 pipeline hazard 的時序關係）只用文字條列，讀者無法一眼看出「哪個週期」發生「什麼衝突」。
+- ASCII 圖對齊錯亂，欄位沒有等寬，反而增加閱讀負擔。
+- 圖畫出來後沒有搭配文字說明關鍵訊號/箭頭代表的意義。
+
+---
+
+# Interview Questions
+
+- 為什麼 pipeline hazard 的說明特別依賴時序圖而不是純文字？
+
+---
+
+# Summary
+
+CPU、pipeline、cache、樹狀/圖狀結構優先用 ASCII diagram 呈現；pipeline 用「指令 × 週期」表格、datapath 用方框+箭頭、cache address 用長條切分圖，圖之後要搭配文字說明關鍵訊號。

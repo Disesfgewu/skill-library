@@ -1,0 +1,94 @@
+# Metadata
+
+Name: computer_architecture-router
+Category: router
+Tags: [router, computer-architecture, topic-classification]
+Dependencies: [overview]
+Related Skills: [shared/teaching, shared/reasoning, shared/diagram, shared/citation]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+判斷一個已經被 Global Router 歸類為 Computer Architecture 的問題，需要載入哪些子領域（sub-folder）以及哪些 Topic Skills，再依 `manifest.yaml` 解析依賴後，把控制權交給對應的 Topic Skills。跟 Global Router 一樣，本身不回答問題內容。
+
+---
+
+# Concepts
+
+- **Sub-domain**：`domains/computer_architecture/` 底下的資料夾（`pipeline/`、`cache/`、`isa/` 等），每個對應課程中的一個大主題。
+- 一個問題可能只需要一個 sub-domain 底下的一到兩個 Topic Skill（例如單純問 forwarding 是什麼），也可能需要橫跨多個 sub-domain（例如問「cache miss 為什麼會讓 pipeline stall」同時牽涉 `pipeline/` 與 `cache/`）。
+- 載入 Topic Skills 前，先查對應 sub-domain 底下的 `manifest.yaml`，把 `requires` 列出的依賴一併載入，`optional` 則視問題深度決定是否載入。
+
+---
+
+# Theory
+
+Domain Router 存在的理由，跟 Global Router 用同一個原則：分類的粒度不同，需要的專業知識也不同。判斷「這題屬於 CA 還是 Networking」只需要粗略辨識關鍵字；判斷「這題是要用 forwarding 還是 stall 來解釋」需要理解 pipeline hazard 的分類，是 Domain 內部的專業判斷，應該由熟悉 CA 內部結構的 Router 負責，而不是塞進 Global Router。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## Sub-domain 對照表
+
+見 `manifest.yaml` 的 `subdomains` 區塊，含各 sub-domain 涵蓋範圍與建置狀態（`built` / `planned`）。目前只有 `pipeline/` 是 `built`。
+
+## 判斷流程
+
+1. 讀取問題關鍵字，對照 `manifest.yaml` 的 `covers` 欄位，找出最相關的 sub-domain。
+2. 若對應 sub-domain 狀態為 `planned`（尚未建置），誠實告知使用者這部分知識庫尚未完成，不得用其他 sub-domain 內容勉強拼湊。
+3. 若狀態為 `built`，載入該 sub-domain 的 `router.skill`，由它進一步判斷需要哪些 Topic Skills。
+4. 跨 sub-domain 問題：分別對每個相關 sub-domain 執行上述流程，再整合。
+
+---
+
+# Example
+
+```
+問題：Pipeline 為什麼需要 Forwarding？
+Sub-domain: pipeline (built)
+Load: domains/computer_architecture/pipeline/router.skill
+```
+
+```
+問題：Direct-mapped cache 跟 set-associative cache 的差別？
+Sub-domain: cache (planned)
+回應：Computer Architecture 底下的 cache 子領域知識庫尚未建置，目前無法用完整的
+Topic Skills 回答，僅能提供概念性摘要並註明知識庫缺口。
+```
+
+```
+問題：Cache miss 造成的 memory stall 會怎麼影響 pipeline？
+Sub-domain: pipeline (built), cache (planned)
+Load: domains/computer_architecture/pipeline/router.skill
+註記：cache 相關部分的完整知識庫尚未建置，先用 pipeline/stall.skill 中「記憶體延遲
+造成的結構性 stall」概念回答可回答的部分，並告知 cache 子領域待補。
+```
+
+---
+
+# Common Mistakes
+
+- 對 `planned` 狀態的 sub-domain 假裝有完整知識庫並生成內容，而非誠實標示缺口。
+- 只載入 `requires` 依賴，忽略問題明顯需要的 `optional` 依賴（例如問「branch misprediction 的代價」卻不載入 `speculation.skill`）。
+- 跨 sub-domain 問題只處理其中一個 sub-domain。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+Computer Architecture Domain Router 依 `manifest.yaml` 判斷問題屬於哪個/哪些 sub-domain，`built` 的載入對應 `router.skill` 繼續往下判斷 Topic Skills，`planned` 的誠實告知知識庫缺口；本身不回答問題內容。

@@ -1,0 +1,90 @@
+# Metadata
+
+Name: bubble
+Category: computer_architecture/pipeline
+Tags: [pipeline, bubble, nop, stall-implementation]
+Dependencies: [pipeline_overview, pipeline_hazard, stall]
+Related Skills: [branch_prediction, speculation]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`stall` 說明了「讓指令原地停一個週期」的概念，但硬體上並沒有真的讓時脈停止——時脈仍然照常跳動，pipeline 的每個 stage 每個週期都在動作。**Bubble** 就是在硬體層級具體實現「stall 看起來像暫停」這件事的手法：往 pipeline 中插入一個什麼都不做的無效指令（no-op），讓它像氣泡一樣在 pipeline 中往後流動，取代原本應該執行的操作。
+
+---
+
+# Concepts
+
+- **Bubble（氣泡）**：一個被清空成無操作（NOP）的 pipeline stage 內容，通常透過把該 stage 對應的 pipeline register 中的控制訊號全部清成「不做任何事」（RegWrite=0、MemWrite=0 等）來實現。
+- **Bubble 插入的位置**：通常插在造成 stall 的那個指令與它前面指令之間，例如 load-use hazard 時，插在 `lw` 與需要它結果的指令之間。
+- Bubble 會隨著時脈一路往 MEM、WB 方向「流動」，最終跟一般執行到 WB 的指令一樣完成它的（無意義的）生命週期，只是不寫入任何暫存器或記憶體。
+
+---
+
+# Theory
+
+理解 bubble 的關鍵是：pipeline 的每個 stage 每個週期都在「處理某個東西」，硬體無法真的讓某個 stage 空著什麼都不管。當需要 stall 時，實際發生的是：
+1. 造成 hazard 的指令（例如 load-use hazard 中在它後面的指令）被要求「原地不動」——它對應的 pipeline register 內容在下一個週期維持不變，等於重複停留在同一個 stage。
+2. 它原本應該進入的下一個 stage，不能空在那裡，於是被塞入一個 bubble（NOP），確保下一個 stage 這個週期「有事做」，但做的是無意義的空操作。
+3. bubble 之後會像正常指令一樣，繼續往 EX、MEM、WB 流動，只是每個 stage 看到的控制訊號都是「不寫入、不修改任何架構狀態」，所以它流過整個 pipeline 卻不會產生任何副作用。
+
+---
+
+# Hardware
+
+延續 `stall` skill 的例子（`lw x1, 0(x2)` 接著 `add x4, x1, x5`）：
+
+```
+Cycle:            1    2    3    4    5    6
+lw  x1, 0(x2):   IF   ID   EX   MEM  WB
+add x4, x1, x5:       IF   ID   ID   EX   MEM  WB
+bubble:                         EX*  MEM  WB
+                                 ^
+                    週期4：add 仍停在 ID，EX 階段沒有指令可做，
+                    塞入一個 bubble（NOP）流過 EX->MEM->WB，不寫入任何東西
+```
+
+`add` 實際停留在 ID 兩個週期（週期 3、4），它原本週期 4 應該進入的 EX 階段，被一個 bubble 佔據，避免 EX 階段這個週期是「未定義」狀態。
+
+---
+
+# Software
+
+Bubble 在控制訊號層級的具體做法：把即將進入下一個 stage 的 pipeline register 中所有跟「修改架構狀態」相關的控制訊號清零，例如：
+
+```
+ID/EX.RegWrite  = 0   # 不寫暫存器
+ID/EX.MemWrite  = 0   # 不寫記憶體
+ID/EX.MemRead   = 0   # 不讀記憶體（避免不必要的存取）
+ID/EX.destReg   = 0 (或指向 x0)  # 即使誤判寫入也寫到 x0，不影響架構狀態
+```
+
+這樣即使這個「假指令」照常流過 EX、MEM、WB，也不會對任何暫存器或記憶體造成實際影響。
+
+---
+
+# Example
+
+見上方 Hardware 段的時序圖：`add` 因 load-use hazard 在 ID 多停一個週期，這一個週期空出來的 EX 階段被一個 bubble 填補，bubble 隨後正常流過 MEM、WB，但不寫入任何東西——外部觀察者看到的效果，就等同於「pipeline 在這裡暫停了一個週期」。
+
+---
+
+# Common Mistakes
+
+- 把 stall 和 bubble 當成兩個獨立、互斥的機制——bubble 其實就是 stall 在硬體上的具體實現方式，兩者是同一件事的不同描述層次（stall 是效果、bubble 是手段）。
+- 忘記 bubble 本身也要流過完整的 EX/MEM/WB，誤以為它憑空消失，導致時序圖畫錯後續週期的指令對齊。
+
+---
+
+# Interview Questions
+
+- Bubble 跟一般的 NOP 指令（例如編譯器主動插入的 `nop`）在效果上有什麼異同？
+- 如果連續發生兩次 load-use hazard，時序圖上會插入幾個 bubble？
+
+---
+
+# Summary
+
+Bubble 是 stall 在硬體上的具體實現：把某個 stage 的控制訊號全部清成無操作，讓一個「假指令」流過 EX/MEM/WB 卻不修改任何架構狀態，藉此填補因 hazard detection 而空出來的 stage，讓 pipeline 在時脈持續跳動的前提下呈現出「暫停一個週期」的效果。

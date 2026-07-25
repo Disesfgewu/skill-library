@@ -1,0 +1,103 @@
+# Metadata
+
+Name: forwarding
+Category: computer_architecture/pipeline
+Tags: [pipeline, forwarding, bypassing, data-hazard]
+Dependencies: [pipeline_overview, pipeline_hazard]
+Related Skills: [stall, pipeline_register]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`pipeline_hazard` 說明 RAW data hazard 的根源，是「結果算出來的時間」跟「寫回暫存器檔的時間」中間有延遲，但後面的指令等不及,已經要用這個值。Forwarding（又稱 bypassing）的目標，是在**不停下 pipeline**的前提下解決這個問題——結果一算出來，就直接送到需要它的地方，不用等寫回暫存器再讀出來這一整圈。
+
+---
+
+# Concepts
+
+Forwarding 需要三個硬體元件：
+
+1. **偵測邏輯（hazard detection / forwarding unit）**：比較「前面指令即將寫入的目的暫存器編號」跟「後面指令要讀的來源暫存器編號」，判斷是否需要轉送。
+2. **額外資料路徑**：從 EX/MEM register、MEM/WB register 額外接一條線,直接連到 EX 階段 ALU 的輸入端。
+3. **多工器（MUX）**：在 ALU 輸入端加一個多工器，依偵測邏輯的判斷結果，選擇「正常從暫存器檔讀來的值」還是「轉送過來的值」。
+
+---
+
+# Theory
+
+Forwarding 之所以能在不停下 pipeline 的情況下解決 RAW hazard，是因為它繞過了「必須先寫回暫存器檔、再從暫存器檔讀出」這一圈固定延遲——ALU 算出結果的當下（EX 階段結束時），這個值就已經以電子訊號的形式存在於 EX/MEM pipeline register 裡，比它真正寫進暫存器檔（WB 階段）早了兩個週期。Forwarding 就是利用這個「值其實已經算出來了，只是還沒『正式』寫回」的事實，直接把它接到下一個需要它的地方。
+
+常見的兩種轉送路徑：
+- **EX/MEM → EX（EX hazard）**：前一個指令跟後一個指令只差一個週期進 pipeline，前一個指令的結果在 EX/MEM register 裡，直接轉送給後一個指令的 EX 階段輸入。
+- **MEM/WB → EX（MEM hazard）**：前一個指令跟後一個指令差兩個週期進 pipeline，前一個指令的結果已經在 MEM/WB register 裡。
+
+---
+
+# Hardware
+
+```
+Cycle:        1    2    3    4    5
+add x1,x2,x3: IF   ID   EX   MEM  WB
+sub x4,x1,x5:      IF   ID   EX   MEM  WB
+                              ^
+                    add 的 EX 結果（週期3結束時已算出，存在 EX/MEM register）
+                    直接轉送給 sub 的 EX 輸入（週期4），不必等 add 的 WB（週期5）
+```
+
+資料路徑示意（EX hazard 的情況）：
+
+```
+         +-----+                +-------+
+Reg File | ALU |--------------->| EX/MEM|
+  |      +-----+       |        +-------+
+  |         ^            \___________|
+  |         |  MUX             (forward path)
+  +---------+
+   (normal register read path)
+```
+
+ALU 輸入端的多工器，依 forwarding unit 判斷，在「暫存器檔讀出值」與「EX/MEM 或 MEM/WB 轉送值」之間擇一。
+
+---
+
+# Software
+
+Forwarding unit 的判斷邏輯（概念上）：
+
+```
+若 (EX/MEM.RegWrite 為真) 且 (EX/MEM.destReg == ID/EX.srcReg1) 且 (destReg != x0)：
+    ForwardA = 從 EX/MEM 轉送
+否則若 (MEM/WB.RegWrite 為真) 且 (MEM/WB.destReg == ID/EX.srcReg1) 且 (destReg != x0)：
+    ForwardA = 從 MEM/WB 轉送
+否則：
+    ForwardA = 正常從暫存器檔讀值
+```
+（RISC-V 中 x0 恆為 0，即使被「寫入」也不需要轉送，這是判斷式中排除 x0 的原因；srcReg2/ForwardB 邏輯相同。）
+
+---
+
+# Example
+
+`add x1, x2, x3` 接著 `sub x4, x1, x5`：add 在週期 3（EX）算出 x1 的新值，這個值進入 EX/MEM register；sub 在週期 4 進入 EX 階段，此時 forwarding unit 偵測到「EX/MEM 裡的目的暫存器是 x1，剛好是 sub 要讀的來源暫存器」，於是 MUX 選擇轉送路徑，sub 的 ALU 直接用剛算出來的正確 x1 值，而不是暫存器檔裡尚未更新的舊值。
+
+---
+
+# Common Mistakes
+
+- 以為 forwarding 可以解決所有 data hazard——**load 指令**的結果要到 MEM 階段結束才拿得到（不是 EX 階段），如果緊接在 load 後面的指令在 EX 階段就需要這個值，forwarding 來不及，這種情況（load-use hazard）仍然需要搭配一個週期的 `stall`。
+- 忘記排除 x0（RISC-V 中恆為 0 的暫存器），誤判需要轉送。
+
+---
+
+# Interview Questions
+
+- 為什麼 forwarding 沒辦法解決 load-use hazard，還需要搭配一個週期的 stall？
+- EX hazard 跟 MEM hazard 兩種轉送路徑，為什麼要分別判斷、且 EX hazard 優先於 MEM hazard？
+
+---
+
+# Summary
+
+Forwarding 用額外硬體路徑（EX/MEM、MEM/WB 到 EX 輸入的轉送路徑 + MUX + 偵測邏輯）把已經算出但尚未正式寫回的結果直接送給需要它的後續指令，在不停下 pipeline 的前提下解決大部分 RAW data hazard；但無法解決 load-use hazard，仍需搭配一個週期的 stall。

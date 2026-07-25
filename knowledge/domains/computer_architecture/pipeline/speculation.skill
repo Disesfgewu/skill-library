@@ -1,0 +1,87 @@
+# Metadata
+
+Name: speculation
+Category: computer_architecture/pipeline
+Tags: [pipeline, speculation, flush, misprediction-penalty, control-hazard]
+Dependencies: [pipeline_overview, pipeline_hazard, branch_prediction]
+Related Skills: [bubble]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+`branch_prediction` 說明了如何「猜」分支方向與目標。**Speculation（推測執行）** 是猜完之後實際採取的行動：不等分支結果確定，就依照預測結果，讓 IF（甚至更之後的 stage）繼續抓取、執行「預測路徑」上的指令。這麼做能在預測正確時完全不損失效能，但代價是預測錯誤時，必須有一套機制把這些「投機執行」但不該發生的指令作廢，並回到正確路徑——這就是本 skill 要說明的清空（flush）與回復（recovery）機制。
+
+---
+
+# Concepts
+
+- **Speculative Execution（推測執行）**：在分支結果未確定前，依預測結果繼續讓後續 stage 處理預測路徑上的指令。
+- **Flush（清空）**：預測錯誤確定後，把已經進入 pipeline、但屬於錯誤路徑的指令全部作廢（做法與 `bubble` 相同——把它們的控制訊號清成無操作），不讓它們寫入任何架構狀態。
+- **Misprediction Penalty（預測錯誤代價）**：從分支進入 pipeline 到分支結果真正確定，中間已經抓取了多少個屬於錯誤路徑的指令，這些指令的週期就是白白浪費掉的代價，通常以週期數表示。
+- **Recovery（回復）**：清空錯誤路徑指令後，把 PC 導向正確的目標位址，讓 IF 從下一個週期開始重新抓取正確路徑的指令。
+
+---
+
+# Theory
+
+Misprediction penalty 的大小，直接由「分支結果確定在第幾個 stage」決定：如果分支要到 EX 階段才能確定方向與目標，那麼在分支之後的 IF、ID 兩個 stage 已經各抓了一個屬於（可能錯誤的）預測路徑的指令，一旦確認猜錯，這兩個指令都要被清空——也就是說，misprediction penalty 約為「分支確定結果的 stage 編號減一」個週期。stage 拆得越細（例如把分支判斷延後到更後面的 stage 才做，或整體 pipeline 更深），這個代價會越大，這也是為什麼「盡量在 pipeline 早期就算出分支方向」（例如把比較邏輯提前到 ID 階段做，而不是等到 EX）是常見的效能優化方向。
+
+清空的具體做法跟 `bubble` 完全相同：把已經進入 pipeline、但屬於錯誤路徑的每一個 stage 的控制訊號清成無操作,讓它們像氣泡一樣流過剩下的 stage 卻不修改任何架構狀態，同時把 PC 設成正確的目標位址，讓 IF 從下一個週期開始抓正確路徑的指令。
+
+---
+
+# Hardware
+
+假設分支在 EX 階段才確定結果，且預測錯誤：
+
+```
+Cycle:              1    2    3    4    5
+beq  x1,x0,target:  IF   ID   EX   MEM  WB   <- EX 階段確定：預測錯了
+(預測路徑)wrong1:         IF   ID   EX*  MEM  WB   <- 週期3起被清空(flush)
+(預測路徑)wrong2:              IF   ID*             <- 週期3起被清空(flush)
+(正確路徑)correct1:                      IF   ID   EX  ...  <- 週期4起才開始抓正確路徑
+```
+
+`beq` 在週期 3（EX）確定預測錯誤，此時 `wrong1`（已進 EX）、`wrong2`（已進 ID）兩個屬於錯誤路徑的指令被清空（打上 `*`），PC 被導向正確目標，`correct1` 從週期 4 開始重新抓取——這個例子中 misprediction penalty 是 2 個週期（`wrong1`、`wrong2` 各佔用的一個週期被浪費）。
+
+---
+
+# Software
+
+清空與回復需要的控制訊號（概念上，位於分支確定結果的那個 stage）：
+
+```
+若 (這個 stage 判斷分支預測錯誤)：
+    清空所有比這個分支更晚進入 pipeline、且已經在 pipeline 中的指令
+    （把它們對應的 pipeline register 控制訊號清成無操作，同 bubble 做法）
+    PC <- 正確的目標位址
+    IF 從下一個週期開始，改抓 PC 指向的正確位址
+```
+
+---
+
+# Example
+
+見上方 Hardware 段的時序圖：預測分支會跳到某個 target，但 EX 階段確認實際上沒跳（或跳到別的位址），已經抓進 pipeline 的 `wrong1`、`wrong2` 被清空，PC 重新導向正確路徑，`correct1` 從週期 4 開始正常進入 pipeline——期間浪費了 2 個週期的吞吐量，這就是這次預測錯誤的具體代價。
+
+---
+
+# Common Mistakes
+
+- 以為 speculation 出錯時只需要「不寫回結果」就好，忽略已經進入 pipeline 的錯誤路徑指令若不清空控制訊號，仍可能造成不該發生的記憶體寫入或暫存器寫入等副作用。
+- 把 misprediction penalty 想成固定值，忽略它實際上取決於「分支結果在哪個 stage 確定」，pipeline 設計改變（例如把分支判斷提前）會直接改變這個代價。
+
+---
+
+# Interview Questions
+
+- 如果一個處理器把分支判斷邏輯從 EX 提前到 ID 階段完成，misprediction penalty 會怎麼變化？為什麼這通常需要額外的硬體代價（例如提前的比較器）？
+- 為什麼清空（flush）錯誤路徑的指令，做法可以直接套用 `bubble` skill 描述的機制？
+
+---
+
+# Summary
+
+Speculation 是預測之後「真的照著猜的方向繼續執行」的行動；預測正確時完全不損失效能，預測錯誤時要清空（flush，做法同 bubble）所有已進入 pipeline 的錯誤路徑指令、把 PC 導向正確位址重新抓取（recovery），代價（misprediction penalty）的大小取決於分支結果在 pipeline 的哪個 stage 才能確定。

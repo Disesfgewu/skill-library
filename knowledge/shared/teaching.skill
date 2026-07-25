@@ -1,0 +1,74 @@
+# Metadata
+
+Name: teaching
+Category: shared
+Tags: [teaching, pedagogy, response-structure]
+Dependencies: []
+Related Skills: [reasoning, diagram, citation]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+規定所有 Knowledge Skills 回答問題時的教學順序，確保回答對初學者友善、對進階者也有推導深度，而不是一段沒有結構的知識傾倒。
+
+---
+
+# Concepts
+
+任何知識性回答都必須依照以下順序組織：
+
+1. **Why** — 為什麼需要這個概念/機制？它解決了什麼問題？沒有它會發生什麼問題？
+2. **How** — 這個機制實際上如何運作？包含步驟、資料流、控制邏輯。
+3. **Example** — 用具體例子（數值、指令序列、時序圖）走一遍 How 描述的流程。
+4. **Summary** — 三到五句話重點整理，適合當作複習卡片。
+
+---
+
+# Theory
+
+Why-How-Example-Summary 的順序對應學習遷移（transfer of learning）的常見結構：先建立動機才不會覺得知識是憑空出現的規則；How 建立可操作的心智模型；Example 把抽象模型錨定到具體情境，是驗證理解的關鍵步驟；Summary 則是給讀者一個可以之後快速回想的錨點。
+
+---
+
+# Hardware
+
+（不適用 — 本 skill 規範的是回答結構，非硬體行為）
+
+---
+
+# Software
+
+實作上，任何 Topic Skill 的正文若沒有明確標出 Why/How/Example/Summary 四段，載入這個 skill 的 agent 應該在回答時自行補上這個順序，而不是照抄 Topic Skill 原文順序。
+
+---
+
+# Example
+
+**問題**：Pipeline 為什麼需要 Forwarding？
+
+- Why：Pipeline 讓多個指令重疊執行，但後面的指令可能需要前面指令「還沒寫回暫存器」的結果，直接讀暫存器會讀到舊值 → data hazard。
+- How：Forwarding 在 ALU 輸出（或 MEM 輸出）之後、寫回暫存器之前，額外接一條路徑直接把結果送到需要它的下一階段輸入端，繞過還沒更新的暫存器檔案。
+- Example：`add x1, x2, x3` 接著 `sub x4, x1, x5`：sub 在 ID 階段讀到的 x1 若直接查暫存器會是舊值；forwarding 把 add 在 EX 階段算出的結果直接送進 sub 的 EX 輸入，讓 sub 能算出正確答案。
+- Summary：Forwarding 是用額外硬體路徑繞過暫存器寫回延遲，解決 pipeline 中最常見的 data hazard，比插入 stall 更省時間。
+
+---
+
+# Common Mistakes
+
+- 只回答 How，跳過 Why，讓讀者記住規則但不理解動機。
+- Example 用抽象符號（A、B、C）而非具體、可驗證的數值或指令。
+- Summary 寫成新資訊而非既有內容的濃縮。
+
+---
+
+# Interview Questions
+
+- 為什麼教學型技術回答要先講 Why 而不是先講定義？
+
+---
+
+# Summary
+
+所有知識回答固定走 Why → How → Example → Summary 四段，先建立動機、再給機制、再給具體例子驗證、最後給可回顧的重點摘要。

@@ -1,0 +1,82 @@
+# Metadata
+
+Name: pipeline_register
+Category: computer_architecture/pipeline
+Tags: [pipeline, pipeline-register, latch, datapath]
+Dependencies: [pipeline_overview]
+Related Skills: [pipeline_hazard, forwarding]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+如果 5 個 stage 直接串接、中間沒有任何東西隔開，某個 stage 算到一半的中間結果會跟下一個週期另一個指令在同一個 stage 算出的結果混在一起，整個 pipeline 就無法正確運作。Pipeline register 的存在，就是要在 stage 之間建立乾淨的邊界，讓「屬於某個指令、某個 stage」的資料被鎖存（latch）住，直到下一個週期才傳給下一個 stage。
+
+---
+
+# Concepts
+
+5-stage pipeline 有 4 個 pipeline register，各自命名對應它連接的兩個 stage：
+
+- **IF/ID**：存放 IF 讀到的指令（原始指令位元、PC+4）。
+- **ID/EX**：存放 ID 解碼出的控制訊號、暫存器讀出的值、立即值（immediate）。
+- **EX/MEM**：存放 EX 算出的 ALU 結果、要寫入記憶體的資料、控制訊號。
+- **MEM/WB**：存放 MEM 讀出的記憶體資料（或轉送過來的 ALU 結果）、要寫回的目的暫存器編號。
+
+---
+
+# Theory
+
+Pipeline register 本質上是一組在每個時脈邊緣（clock edge）更新的正反器（flip-flop）。它同時做兩件事：
+
+1. **時間隔離**：確保 stage N 在這個週期看到的是「上一個週期 stage N-1 算完的結果」，而不是這個週期正在算的半成品。
+2. **狀態傳遞**：把指令執行過程中還會用到、但這個 stage 自己不需要的資訊繼續往後傳（例如目的暫存器編號在 EX、MEM 階段都用不到實際運算，但 WB 階段需要知道要寫回哪個暫存器，所以要一路從 ID/EX 傳到 EX/MEM 再傳到 MEM/WB）。
+
+沒有正確傳遞這些「暫時用不到但之後會用到」的資訊，是 pipeline datapath 設計中最常見的疏漏之一。
+
+---
+
+# Hardware
+
+```
+        +------+  +------+  +------+  +------+  +------+
+IF----->| IF/ID|->|  ID  |->| ID/EX|->|  EX  |->| EX/MEM|->|  MEM |->| MEM/WB|->|  WB  |
+        +------+  +------+  +------+  +------+  +------+  +------+  +------+  +------+
+```
+
+每個 `IF/ID`、`ID/EX`、`EX/MEM`、`MEM/WB` 方框都是一組正反器，在每個時脈邊緣把左邊 stage 的輸出鎖存起來，成為右邊 stage 這個週期的輸入。
+
+---
+
+# Software
+
+Pipeline register 傳遞的欄位大致可分三類：
+- **資料類**：暫存器讀出值、ALU 結果、記憶體讀出值、立即值。
+- **控制類**：這個指令是否要寫暫存器（RegWrite）、是否要存取記憶體（MemRead/MemWrite）、ALU 該做什麼運算（ALUOp）等，這些訊號在 ID 階段被解碼出來，之後隨著指令一路往右傳，讓後面的 stage 知道「該對這個指令做什麼」而不需要重新解碼。
+- **簿記類（bookkeeping）**：目的暫存器編號、PC 值（分支指令算目標位址、或除錯用）。
+
+---
+
+# Example
+
+以 `add x1, x2, x3` 為例，`ID/EX` register 會存住：從暫存器檔讀到的 x2、x3 的值、目的暫存器編號 `x1`、以及告訴 EX 階段「這是一個加法」的控制訊號。等這個指令走到 `EX/MEM` register 時，x2、x3 的值已經用完（EX 已經算出結果）不再需要，但目的暫存器編號 `x1` 仍然要繼續往後傳，直到 WB 階段才會真正用到它。
+
+---
+
+# Common Mistakes
+
+- 誤以為 pipeline register 只傳資料，忘記控制訊號也必須跟著指令一起往後傳（否則後面的 stage 不知道該對這個指令做什麼）。
+- 忘記傳遞「目的暫存器編號」這類要到 WB 階段才用得到的簿記資訊，導致 WB 階段不知道該寫回哪個暫存器。
+
+---
+
+# Interview Questions
+
+- 為什麼控制訊號要在 ID 階段解碼一次，然後跟著 pipeline register 往後傳，而不是每個 stage 各自重新解碼一次？
+
+---
+
+# Summary
+
+Pipeline register（IF/ID、ID/EX、EX/MEM、MEM/WB）是 stage 之間的正反器邊界，負責時間隔離（避免不同指令、不同週期的中間結果混淆）與狀態傳遞（把資料、控制訊號、簿記資訊一路往後傳到真正需要的 stage）。

@@ -1,0 +1,114 @@
+# Metadata
+
+Name: global-router
+Category: router
+Tags: [router, domain-classification, entrypoint]
+Dependencies: []
+Related Skills: [shared/teaching, shared/reasoning]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+這是 `knowledge/` 整個系統的唯一入口。它不回答任何知識性問題，只做一件事：判斷使用者的問題屬於哪一個（或哪幾個）Domain，然後把控制權交給對應 Domain 的 `domains/<domain>/router.skill`。
+
+任何載入這個 skill 的 agent，都必須遵守：**Global Router 本身絕對不回答問題內容**，只輸出判斷出的 Domain 與下一步要載入的檔案路徑。
+
+---
+
+# Concepts
+
+- **Domain**：一個大的知識領域，對應 `domains/` 底下的一個資料夾。
+- 一個問題可以對應到一個 Domain，也可以同時對應多個 Domain（跨領域問題）。
+- Global Router 判斷完 Domain 後即結束自己的工作，不繼續往下判斷 Topic —— Topic 層級的判斷是 Domain Router 的責任。
+
+---
+
+# Theory
+
+三層 Router 架構把「判斷問題屬於哪個大領域」跟「判斷這個領域內需要哪些細部知識」分開，原因是：跨領域的分類規則（例如「這題是不是在問作業系統」）跟領域內的分類規則（例如「這題是不是在問 forwarding 還是 branch prediction」）需要完全不同的專業知識去判斷。把兩者混在同一層，會讓 Router 需要同時精通所有領域的細節分類，難以維護、也難以在新增領域時不影響既有判斷。
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 已註冊的 Domain
+
+| Domain | 資料夾 | 狀態 |
+| --- | --- | --- |
+| Computer Architecture | `domains/computer_architecture/` | 已建立（`pipeline/` 子領域已完整，其餘子領域待建） |
+| Operating System | `domains/operating_system/` | 尚未建立 |
+| Linux | `domains/linux/` | 尚未建立 |
+| Compiler | `domains/compiler/` | 尚未建立 |
+| Networking | `domains/networking/` | 尚未建立 |
+| Distributed System | `domains/distributed_system/` | 尚未建立 |
+| Database | `domains/database/` | 尚未建立 |
+| AI | `domains/ai/` | 尚未建立 |
+| Mathematics | `domains/mathematics/` | 尚未建立 |
+
+尚未建立的 Domain 若被判斷為問題所屬領域，且底下沒有對應 `router.skill`，應如實告知使用者「這個領域的知識庫尚未建立」，而不是嘗試用其他 Domain 的知識勉強回答。
+
+## 判斷規則
+
+1. 讀取使用者問題的關鍵字與意圖。
+2. 對照下方 Example 的判斷案例，找出最相近的 Domain。
+3. 若問題明確橫跨多個 Domain（例如同時牽涉 Linux 系統呼叫與 Computer Architecture 的中斷處理），輸出多個 Domain，全部載入。
+4. 輸出格式：`Domain: <domain_name>` `Load: domains/<domain_name>/router.skill`。
+
+---
+
+# Example
+
+```
+問題：Pipeline 為什麼需要 Forwarding？
+Domain: Computer Architecture
+Load: domains/computer_architecture/router.skill
+```
+
+```
+問題：TCP 三向交握
+Domain: Networking
+Load: domains/networking/router.skill  (尚未建立)
+```
+
+```
+問題：Docker namespace
+Domain: Linux, Operating System
+Load: domains/linux/router.skill (尚未建立), domains/operating_system/router.skill (尚未建立)
+```
+
+```
+問題：Cache 一致性協定跟多執行緒同步的關係？
+Domain: Computer Architecture
+Load: domains/computer_architecture/router.skill
+（註：cache coherency / multithreading synchronization 屬於 CA 課程範圍內，見
+domains/computer_architecture/overview.skill 的 Linux Interaction 之外，但目前
+computer_architecture/ 底下對應子領域尚未建立，Domain Router 應如實告知。）
+```
+
+---
+
+# Common Mistakes
+
+- Global Router 自己試圖回答問題內容，而不是只做 Domain 判斷。
+- 對於明顯跨領域的問題，只選一個 Domain，漏掉其他相關領域。
+- 對尚未建立的 Domain，仍然嘗試用其他 Domain 的知識拼湊回答，而不誠實告知知識庫缺口。
+
+---
+
+# Interview Questions
+
+（不適用 — 本 skill 為系統性 router，非知識性主題）
+
+---
+
+# Summary
+
+Global Router 是整個 `knowledge/` 系統的唯一入口，只負責判斷 Domain（可能多個）並指向對應的 `domains/<domain>/router.skill`，本身不回答任何知識內容；遇到尚未建立的 Domain 要誠實告知，不得拼湊回答。

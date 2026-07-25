@@ -1,0 +1,104 @@
+# Metadata
+
+Name: computer_architecture-overview
+Category: domain-overview
+Tags: [computer-architecture, scope, sources]
+Dependencies: []
+Related Skills: [router]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+定義 Computer Architecture Domain 的知識範圍與來源優先順序，讓 Domain Router 與所有 Topic Skills 有一致的邊界與引用依據。
+
+---
+
+# Concepts
+
+## 知識範圍
+
+以國立成功大學 Computer Architecture 課程結構為主要依據（見下方 Software 段的課程對照），涵蓋：
+
+- Number Representation：Binary、Floating Point、Fixed-point Arithmetic
+- C Memory Layout / Memory Management
+- ISA：RISC-V Instructions、Instruction Formats、Assembly、Calling Convention
+- Toolchain：Compiling / Assembling / Linking / Loading、ELF
+- Digital Logic：Synchronous Digital Systems、Combinational Logic、FSM、State
+- Datapath / Control Unit：Single-cycle CPU 設計
+- Pipeline：5-stage pipeline、Hazard、Forwarding、Stall、Bubble、Branch Prediction、Speculation
+- Cache / Memory Hierarchy：Locality、Cache 結構、Miss/Hit
+- Virtual Memory：Page Table、TLB
+- Performance：CPI、Speedup 計算
+- Parallelism：Multithreading、Synchronization、Cache Coherency、Memory Model
+- I/O：Devices、Polling、Interrupts、Trap Handling
+- RISC vs. CISC 比較、Modern Processor Architecture（Dynamic/Advanced Branch Prediction、Tournament Predictor、Hardware-Based Speculation）
+
+## 知識來源優先順序
+
+1. National Cheng Kung University Computer Architecture Course（`wiki.csie.ncku.edu.tw/arch/schedule`）
+2. Patterson & Hennessy — *Computer Organization and Design, RISC-V Edition*
+3. *Computer Systems: A Programmer's Perspective*（CS:APP）
+4. RISC-V ISA Specification
+5. Intel Software Developer Manual
+6. ARM Architecture Reference Manual
+7. Linux Kernel Documentation
+8. 官方技術規格與學術論文（例如 Agner Fog Optimization Manuals、uops.info）
+
+若來源間存在差異，依 `shared/citation.skill` 的規則說明差異，不得任意選一個當唯一答案。
+
+---
+
+# Theory
+
+（不適用 — 本 skill 為範圍/來源定義，非知識性理論）
+
+---
+
+# Hardware
+
+（不適用）
+
+---
+
+# Software
+
+## 課程對照（2025 Fall，NCKU）
+
+| 週次 | 主題 |
+| --- | --- |
+| 1-5 | Number Representation、C Memory、RISC-V Instructions/Assembly、Instruction Formats |
+| 6-7 | Toolchain（Compile/Assemble/Link/Load）、ELF、Digital Logic（SDS、Combinational Logic、FSM） |
+| 8-11 | Datapath、Control、Pipeline（5-Stage） |
+| 12 | Cache Memory |
+| 13-14 | Virtual Memory、OS 概觀、RISC-V Vector Extension |
+| 15-16 | Synchronization、Multithreading、Cache Coherency、Memory Model、I/O、Interrupt、Trap Handling |
+| 17-18 | Modern Processor（Dynamic/Advanced Branch Prediction、Tournament Predictor、Speculation）、RISC vs. CISC |
+
+此對照僅用於決定 Topic Skills 的切分順序與範圍，不代表逐字複製課程投影片內容。
+
+---
+
+# Example
+
+（不適用）
+
+---
+
+# Common Mistakes
+
+- 把某一版教材的簡化模型當成規格書規定的行為。
+- 引用課程投影片或教材原文大段複製，而非用自己的話重新整理。
+
+---
+
+# Interview Questions
+
+（不適用）
+
+---
+
+# Summary
+
+Computer Architecture Domain 以 NCKU 課程結構為主軸，涵蓋 Number Representation 到 Modern Processor Architecture 的完整範圍；來源優先序為 NCKU 課程 → Patterson & Hennessy → CS:APP → 各架構官方規格/手冊 → Linux 文件 → 論文/優化手冊，來源分歧時需並列說明。

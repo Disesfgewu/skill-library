@@ -1,0 +1,115 @@
+# Metadata
+
+Name: branch_prediction
+Category: computer_architecture/pipeline
+Tags: [pipeline, branch-prediction, control-hazard, btb, bht]
+Dependencies: [pipeline_overview, pipeline_hazard]
+Related Skills: [stall, bubble, speculation]
+Difficulty: advanced
+
+---
+
+# Purpose
+
+Control hazard（見 `pipeline_hazard`）的根源，是分支指令要到 pipeline 較後段才能確定「該不該跳」與「跳到哪裡」，但 IF 階段每個週期都必須決定抓哪一個指令。什麼都不做（永遠假設不跳、依序抓取）是最簡單的策略，但如果程式中分支經常真的跳走，會付出很高的清空（flush）代價。Branch prediction 的目標，就是在分支結果真正確定之前，先「猜」一個大機率正確的方向，讓 IF 階段有事可做，減少猜錯時才需要付出的代價。
+
+---
+
+# Concepts
+
+- **Static Prediction（靜態預測）**：預測規則在執行前就固定，不隨執行歷史改變。常見策略：永遠預測不跳（predict-not-taken）、永遠預測跳（predict-taken）、或依指令方向（例如迴圈常見的向後跳分支預測跳、向前跳分支預測不跳）。
+- **Dynamic Prediction（動態預測）**：根據這個分支過去實際執行的歷史，動態調整預測方向。
+- **BHT（Branch History Table）**：一個以分支指令位址索引的表格，存放每個分支最近的方向歷史（例如用 1 或 2 個 bit 記錄「最近幾次是否跳走」）。
+- **Two-bit Predictor（兩位元飽和計數器）**：用 2 個 bit（4 種狀態：strongly-not-taken、weakly-not-taken、weakly-taken、strongly-taken）記錄歷史，比 1-bit predictor 更能容忍「單一次例外」而不立刻翻轉預測方向。
+- **BTB（Branch Target Buffer）**：一個以分支指令位址索引的表格，存放這個分支上次跳走時的目標位址，讓 IF 階段不用等分支算完目標位址，就能直接猜測下一個要抓的位址。
+
+---
+
+# Theory
+
+## 為什麼 2-bit predictor 比 1-bit predictor 好
+
+1-bit predictor 只記錄「上一次是否跳走」，缺點是在一個通常會跳、但偶爾不跳的迴圈分支（例如迴圈跑 100 次，最後一次不跳出迴圈）中，會連續預測錯誤兩次：迴圈中間某一次因為某種原因沒跳（預測器翻成「不跳」），下一次迴圈繼續跳，預測器又猜錯一次，然後才翻回「跳」。2-bit 飽和計數器需要「連續兩次」跟目前狀態方向相反，才會真正翻轉預測方向，單一次例外只會讓狀態從 strongly 降級成 weakly，不會立刻翻轉，因此對「大部分時候某個方向、偶爾一次例外」的模式更準確。
+
+2-bit predictor 狀態機：
+
+```
+        taken           taken           taken
+       +-----> weakly  +-----> strongly +---+
+       |       taken            taken       |
+   +---+---+                            +---+---+
+   |strongly|<-----+                +-->|strongly|
+   |not-taken|     |                |   | taken  |
+   +---+---+       |not-taken       |   +---+---+
+       |       +---+---+            |       |
+       +------>|weakly |------------+       |
+        not-    |not-taken|  taken           |
+        taken   +---------+                  |
+                     ^                       |
+                     +----- not-taken --------+
+```
+
+（狀態沿著 not-taken 方向移動時往左，taken 方向移動時往右；只有從 weakly 狀態再收到相同方向一次，才會到 strongly，從 strongly 收到相反方向一次只會退到 weakly，不會直接翻轉方向。）
+
+## BHT 與 BTB 的分工
+
+BHT 回答「這個分支會不會跳」，BTB 回答「如果跳，跳到哪裡」——兩者是分開的兩個問題，因為即使預測「會跳」，沒有 BTB 提供目標位址，IF 階段還是不知道該抓哪個位址的指令，只能等分支算出目標位址（通常在 EX 或更早的專用加法器）才能抓，這會抵銷掉預測方向帶來的好處。因此高效能設計通常兩者都要有。
+
+---
+
+# Hardware
+
+BTB 查詢流程（IF 階段）：
+
+```
+        PC ---> +-----------------+
+                |  BTB (indexed   |
+                |  by PC)         |
+                +-----------------+
+                    |  hit?
+                    v
+        +-----------+-----------+
+        | 有記錄：用記錄的目標位址  |
+        | 沒記錄：預設 PC+4       |
+        +-----------------------+
+```
+
+BHT 通常與 BTB 整合在同一張表中，或另建一張表，兩者都以分支指令的 PC 做索引。
+
+---
+
+# Software
+
+預測正確與否的驗證時機：分支指令的真實方向與目標位址，通常要到 EX（或專門的分支運算單元）才能確定。驗證方式：把預測結果跟 EX 階段算出的實際結果比較，若不一致，觸發清空（flush，見 `speculation`），並用正確的位址重新抓取指令；若一致，什麼都不用做，因為投機抓取的指令本來就是對的。
+
+---
+
+# Example
+
+一個典型迴圈：
+```
+loop:
+  ...
+  bne  x1, x0, loop   # x1 != 0 就跳回 loop
+```
+這個分支在迴圈執行期間絕大多數時候都「跳」（回到 loop），只有迴圈結束那一次「不跳」。2-bit predictor 執行多次後會穩定在 strongly-taken 狀態，持續正確預測「跳」，直到迴圈真正結束那一次才猜錯一次（且因為是 strongly 狀態，猜錯後只降到 weakly-taken，不影響下一次程式若重新進入迴圈時的預測）。
+
+---
+
+# Common Mistakes
+
+- 把 BHT 跟 BTB 當成同一件事——BHT 只回答方向（跳 / 不跳），BTB 回答目標位址，兩者解決不同問題。
+- 誤以為 2-bit predictor 一定比 1-bit predictor 在任何 pattern 下都更準——2-bit 的優勢specifically 是對「偶爾一次例外」更穩健，某些高度規律交替（跳、不跳、跳、不跳）的 pattern 下兩者表現可能接近，甚至有專門設計對付交替 pattern 的更進階 predictor（tournament predictor 等，屬於 Modern Processor Architecture 的進階主題）。
+
+---
+
+# Interview Questions
+
+- 為什麼 2-bit saturating counter 比 1-bit predictor 更能處理迴圈中「絕大多數時候跳、偶爾一次不跳」的情況？
+- BTB miss（表中沒有這個分支的記錄）時，pipeline 該怎麼處理？
+
+---
+
+# Summary
+
+Branch prediction 分靜態（規則固定）與動態（依歷史調整）兩大類；動態預測常用 BHT 記錄方向歷史（2-bit 飽和計數器比 1-bit 更抗單次例外）、BTB 記錄目標位址，兩者分工解決「跳不跳」與「跳去哪」兩個獨立問題，預測結果要在分支真正算出結果時驗證，錯了才需要靠 `speculation` 描述的清空/回復機制處理。

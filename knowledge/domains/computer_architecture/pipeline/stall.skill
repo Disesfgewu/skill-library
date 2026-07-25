@@ -1,0 +1,88 @@
+# Metadata
+
+Name: stall
+Category: computer_architecture/pipeline
+Tags: [pipeline, stall, load-use-hazard, hazard-detection-unit]
+Dependencies: [pipeline_overview, pipeline_hazard]
+Related Skills: [forwarding, bubble]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`forwarding` 能解決大多數 RAW data hazard，但無法解決一種情況：緊接在 **load** 指令之後的指令，如果馬上就要用 load 讀回來的值。Load 的資料要到 **MEM 階段結束**才從記憶體讀出來，而下一個指令的 EX 階段比 load 的 MEM 階段早一個週期——資料還沒從記憶體出來，forwarding 想轉送也沒有東西可轉。這種情況下，唯一的辦法是讓 pipeline 停下來等一個週期，這就是 **stall**（又稱 pipeline interlock）。
+
+---
+
+# Concepts
+
+- **Load-use hazard**：緊接在 load 指令後面的指令，若讀取的來源暫存器正好是 load 的目的暫存器，就是 load-use hazard。
+- **Hazard detection unit**：專門偵測 load-use hazard 的硬體，一旦偵測到就發出控制訊號，讓後面的指令在 ID 階段多停留一個週期。
+- **Stall（暫停一個週期）**：讓已經進入 pipeline、但還不能繼續往下走的指令原地停留，同時讓它前面的 stage（IF）也跟著停止抓取新指令，避免指令被重複處理或跳過。
+
+---
+
+# Theory
+
+Load 指令的資料流程跟一般算術指令（例如 add）不同：add 在 **EX** 階段就算出結果，可以直接轉送；load 要到 **MEM** 階段存取記憶體之後才有結果，比 add 晚了一個 stage。如果緊接在 load 後面的指令在自己的 EX 階段就要用這個值，時間上是「還沒發生」——即使有 forwarding 硬體，也沒有訊號可以轉送，因為此刻資料根本還沒從記憶體讀出來。
+
+解法是插入一個 stall 週期：讓 load 先多走一步到 MEM（此時資料已經讀出，存進 MEM/WB register），下一個指令則在 ID 階段多停一個週期。這樣一來，當下一個指令真正進入 EX 階段時，load 的結果已經可以透過 MEM/WB → EX 的 forwarding 路徑轉送過去——stall 與 forwarding 是搭配使用，不是互斥的兩種方案。
+
+---
+
+# Hardware
+
+```
+Cycle:            1    2    3    4    5    6
+lw  x1, 0(x2):   IF   ID   EX   MEM  WB
+add x4, x1, x5:       IF   ID   ID*  EX   MEM  WB
+                                 ^
+                       多停留一個週期（stall），x1 的值要到週期4（lw 的 MEM）
+                       才讀出，透過 MEM/WB -> EX 的 forwarding，週期5 的 EX 才能拿到正確值
+```
+
+`ID*` 代表 `add` 指令在 ID 階段被迫多停一個週期（實際硬體上通常靠讓 IF/ID register 的內容保持不變、並把控制訊號清成無操作來實現，見下方 Software 段）。
+
+---
+
+# Software
+
+Hazard detection unit 的判斷邏輯（概念上，位於 ID 階段）：
+
+```
+若 (ID/EX.MemRead 為真)                      # 前一個指令是 load
+   且 (ID/EX.destReg == IF/ID.srcReg1 或 IF/ID.srcReg2)  # 目前這個指令要讀它
+   且 (destReg != x0)：
+       stall 一個週期：
+         - PC 與 IF/ID register 維持不變（下一個週期重新處理同一個指令）
+         - 把 ID/EX register 的控制訊號清成 no-op（相當於插入一個 bubble，見 `bubble` skill）
+```
+
+這個機制常被稱為「插入一個 bubble」——stall 在時序圖上「暫停一個週期」的表現，具體實作方式就是往 pipeline 中間塞入一個無操作（no-op），細節見 `bubble` skill。
+
+---
+
+# Example
+
+`lw x1, 0(x2)` 接著 `add x4, x1, x5`：`add` 在正常情況下應該在週期 3 進入 ID、週期 4 進入 EX，但 hazard detection unit 偵測到 load-use hazard，讓 `add` 在 ID 階段多停一個週期（週期 3、4 都停在 ID），直到週期 5 才進入 EX，此時 `lw` 已經在週期 4 完成 MEM，結果可以透過 forwarding 送到 `add` 的 EX 輸入。
+
+---
+
+# Common Mistakes
+
+- 把 stall 當成「forwarding 失效時的通用後備方案」——實務上只有 load-use hazard 這種特定情況（forwarding 硬體本身能覆蓋的其他 RAW hazard 都不需要 stall）需要靠 stall 解決；把 stall 想成任何 hazard 都要用它會誤判效能影響範圍。
+- 只讓需要等待的那個指令停住，忘記同時讓它前面的 IF 階段也停止抓取新指令，導致指令被重複處理。
+
+---
+
+# Interview Questions
+
+- 為什麼 load-use hazard 沒辦法單靠 forwarding 解決？
+- Stall 對效能的影響怎麼估計？如果程式中 load 指令的比例是 p，緊接著被用到的比例是 q，平均每個指令因 stall 而多花多少週期？
+
+---
+
+# Summary
+
+Stall 是 forwarding 覆蓋不到的情況（主要是 load-use hazard）下，讓 pipeline 原地停留一個週期的機制，由 hazard detection unit 偵測、透過凍結 PC/IF-ID register 並清空 ID/EX 控制訊號來實現，之後仍搭配 forwarding 把 load 的結果送到需要它的地方。

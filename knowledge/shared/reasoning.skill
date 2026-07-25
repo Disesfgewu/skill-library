@@ -1,0 +1,78 @@
+# Metadata
+
+Name: reasoning
+Category: shared
+Tags: [reasoning, rigor, derivation]
+Dependencies: []
+Related Skills: [teaching, citation]
+Difficulty: n/a
+
+---
+
+# Purpose
+
+規定所有 Knowledge Skills 在推導、計算、比較時必須逐步展開，不得跳步，避免給出「結論正確但過程斷裂」的回答，讓讀者無法驗證或跟著推導。
+
+---
+
+# Concepts
+
+- 不得跳步：每一個推導步驟都要寫出來，不能從問題直接跳到答案。
+- 不得省略推導：涉及數學運算（例如浮點數轉換、時脈週期計算、cache miss rate 計算、pipeline speedup 計算）時，中間式子要列出。
+- 必須逐步思考：多因素比較（例如 RISC vs CISC、direct-mapped vs set-associative）時，逐一因素分析後再給結論，不要先給結論再事後補理由。
+
+---
+
+# Theory
+
+逐步推導的價值不在於「看起來更嚴謹」，而在於**可驗證性**：讀者能對照每一步檢查自己的理解哪裡跟出來的推導不一致，進而定位自己真正卡住的地方。這對計算機結構這種高度依賴精確計算（時脈週期、CPI、記憶體位址切割）的領域特別重要，因為錯誤經常藏在某一個中間步驟，而不是最終公式。
+
+---
+
+# Hardware
+
+（不適用 — 本 skill 規範的是推導呈現方式，非硬體行為）
+
+---
+
+# Software
+
+實作上：
+- 數值計算一律列出公式 → 代入數值 → 逐步化簡 → 結果，四段都要出現。
+- 比較型問題（A vs B）用表格或條列，逐一維度比較，不得只給總結性判斷。
+- 若某個步驟依賴前面 skill 的結論（見 manifest 的 `requires`），要先簡短復述那個結論再繼續推導，不能假設讀者記得。
+
+---
+
+# Example
+
+**問題**：一個 5-stage pipeline，若沒有 hazard，理論上比單週期快幾倍？
+
+不得跳步的寫法：
+1. 單週期（single-cycle）處理器每個指令都要跑完最長路徑，假設是 T_single。
+2. Pipeline 把執行過程切成 5 個 stage，每個 stage 的週期時間約為 T_single / 5（忽略 pipeline register 延遲）。
+3. 在沒有 hazard、pipeline 填滿的穩態下，每個週期都能完成一個指令的某個 stage，也就是每個週期「吐出」一個指令的結果。
+4. 因此完成 N 個指令的時間，pipeline 版本約為 (T_single/5) × (N + 4)（4 是填滿 pipeline 的額外週期），單週期版本為 T_single × N。
+5. 當 N 很大時，pipeline 版本時間趨近 T_single × N / 5，也就是理論上限速度提升約為 5 倍（等於 stage 數）。
+
+不合格的寫法（禁止）：「5-stage pipeline 理論上比單週期快 5 倍。」（跳過了為什麼、以及 N 小時不成立的前提）
+
+---
+
+# Common Mistakes
+
+- 直接給出「理論加速比 = stage 數」而不說明是漸進（N 很大）情況下才成立。
+- 比較題只給結論表格，不解釋每一格判斷的依據。
+- 公式代入數值時跳過中間化簡步驟。
+
+---
+
+# Interview Questions
+
+- 為什麼在計算機結構的計算題中，寫出中間步驟比直接給答案更重要？
+
+---
+
+# Summary
+
+所有推導、計算、比較都必須逐步展開：公式 → 代入 → 化簡 → 結果；比較題逐一維度分析再下結論；不假設讀者記得先前步驟的中間結論。

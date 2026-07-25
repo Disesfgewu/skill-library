@@ -1,0 +1,71 @@
+# computer_architecture domain manifest
+#
+# Lists the sub-folders under domains/computer_architecture/, what each covers,
+# and whether it has been built yet. The domain router.skill uses this to decide
+# which sub-folder router.skill to load for a given topic.
+#
+# status: built   -> router.skill + manifest.yaml + topic .skill files exist
+# status: planned -> folder does not exist yet; router.skill should say so honestly
+
+subdomains:
+  foundations:
+    covers: [number-representation, floating-point, boolean-algebra, c-memory-layout]
+    status: planned
+
+  isa:
+    covers: [risc-v-instructions, instruction-formats, risc-vs-cisc]
+    status: planned
+
+  assembly:
+    covers: [risc-v-assembly, calling-convention]
+    status: planned
+
+  logic:
+    covers: [synchronous-digital-systems, combinational-logic, fsm]
+    status: planned
+
+  datapath:
+    covers: [single-cycle-datapath, control-unit]
+    status: planned
+
+  pipeline:
+    covers:
+      - pipeline_overview
+      - pipeline_register
+      - pipeline_hazard
+      - forwarding
+      - stall
+      - bubble
+      - branch_prediction
+      - speculation
+    status: built
+
+  cache:
+    covers: [locality, memory-hierarchy, cache-structure, miss-rate]
+    status: planned
+
+  virtual_memory:
+    covers: [page-table, tlb]
+    status: planned
+
+  performance:
+    covers: [cpi, speedup]
+    status: planned
+
+  parallel:
+    covers: [multithreading, synchronization, cache-coherency, memory-model]
+    status: planned
+
+  linux:
+    covers: [io-devices, polling, interrupts, trap-handling]
+    status: planned
+
+  practice:
+    covers: [interview-question-sets, worked-problems]
+    status: planned
+
+# Cross-subdomain note: pipeline/manifest.yaml lists `datapath` as a required
+# dependency (pipeline execution assumes a working single-cycle datapath as the
+# conceptual baseline). Since datapath/ is still "planned", any topic skill in
+# pipeline/ that references datapath concepts does so inline instead of via a
+# real cross-file load, and flags it as a forward reference.

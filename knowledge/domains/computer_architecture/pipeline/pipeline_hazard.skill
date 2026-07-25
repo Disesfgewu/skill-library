@@ -1,0 +1,90 @@
+# Metadata
+
+Name: pipeline_hazard
+Category: computer_architecture/pipeline
+Tags: [pipeline, hazard, data-hazard, control-hazard, structural-hazard]
+Dependencies: [pipeline_overview, pipeline_register]
+Related Skills: [forwarding, stall, bubble, branch_prediction]
+Difficulty: intermediate
+
+---
+
+# Purpose
+
+`pipeline_overview` 說明了重疊執行帶來吞吐量，但重疊執行有一個前提：後面的指令不會因為跟前面的指令搶資源、搶資料、或搶控制流而算出錯的結果。當這個前提被打破，就發生 **hazard**——如果不處理，pipeline 會產生跟「一次執行一個指令」不一樣（錯誤）的結果。
+
+---
+
+# Concepts
+
+Hazard 分三類：
+
+1. **Structural Hazard（結構性冒險）**：兩個指令在同一個週期需要用同一個硬體資源，但這個資源只有一份。例如指令記憶體與資料記憶體若共用同一個實體記憶體埠，某個週期 IF 要讀指令、同時另一個指令的 MEM 要存取資料，兩者衝突。
+2. **Data Hazard（資料冒險）**：某個指令需要用到前面指令「還沒算完/還沒寫回」的結果。
+3. **Control Hazard（控制冒險）**：分支或跳躍指令還沒決定「下一個要執行的指令是誰」之前，pipeline 已經預先抓了接下來的指令，若猜錯就要作廢重來（見 `branch_prediction`、`speculation`）。
+
+---
+
+# Theory
+
+## Structural Hazard
+
+解法通常是設計上就避免：把指令記憶體與資料記憶體分開（哈佛架構式的分離，即使實體上是同一塊記憶體，也做成雙埠或分成 I-Cache/D-Cache），讓 IF 跟 MEM 不會搶同一個埠。
+
+## Data Hazard 的三種子類型
+
+以指令 i（較早）與指令 j（較晚，i 之後才進 pipeline）為例：
+
+- **RAW（Read After Write）**：j 要讀 i 還沒寫回的值。這是 5-stage in-order pipeline 中唯一真正會發生的資料冒險，因為指令是依序（in-order）進入 pipeline，j 不可能比 i 更早寫。
+- **WAR（Write After Read）**、**WAW（Write After Write）**：在依序發放（in-order issue）、依序寫回（in-order writeback）的簡單 5-stage pipeline 中不會發生，因為 j 不可能比 i 更早讀或更早寫；這兩種冒險是「亂序執行（out-of-order execution）」處理器才需要處理的問題，超出本 skill 範圍（屬於 Modern Processor Architecture 更進階的主題）。
+
+## Control Hazard
+
+分支指令通常要到 pipeline 較後段（例如 EX 或 MEM 階段）才能確定分支方向與目標位址，但 IF 階段每個週期都要抓下一個指令——在分支結果確定之前，pipeline 已經抓了緊接在分支之後、依循序位址（PC+4）的指令。如果分支實際上要跳走，這些已經抓進 pipeline 的指令都是錯的，必須作廢。
+
+---
+
+# Hardware
+
+RAW hazard 的時序範例（`add x1, x2, x3` 後面接 `sub x4, x1, x5`）：
+
+```
+Cycle:        1    2    3    4    5
+add x1,x2,x3: IF   ID   EX   MEM  WB   <- x1 在週期 5 (WB) 才真正寫入暫存器檔
+sub x4,x1,x5:      IF   ID   EX   MEM  WB
+                         ^
+                    週期 3：sub 在 ID 階段讀 x1，
+                    但 add 要到週期 5 才寫回 x1 —— 讀到舊值
+```
+
+---
+
+# Software
+
+編譯器/組譯器角度：知道 in-order 5-stage pipeline 只會有 RAW hazard，是設計 hazard detection unit（硬體自動偵測並插入 stall/forwarding，見 `forwarding`、`stall`）或編譯器指令排程（instruction scheduling，把有相依性的指令盡量隔開）這兩種對策的理論基礎——兩者都只需要偵測「後面的指令是否讀了前面指令即將寫入、但還沒寫入的暫存器」。
+
+---
+
+# Example
+
+見上方 Hardware 段的時序圖：`sub x4, x1, x5` 在週期 3 的 ID 讀到的 x1 是舊值，這是典型 RAW data hazard，需要 `forwarding` 或 `stall` 處理。
+
+---
+
+# Common Mistakes
+
+- 把 WAR/WAW hazard 也當成簡單 in-order 5-stage pipeline 需要處理的問題——這是亂序處理器才有的情況，混為一談會誤判需要的硬體對策。
+- 把所有 hazard 都當成「資料」問題，忽略 structural 與 control 兩類需要完全不同的對策（前者靠硬體資源設計避免，後者靠 `branch_prediction`/`speculation`，而非 `forwarding`）。
+
+---
+
+# Interview Questions
+
+- 為什麼簡單的 in-order 5-stage pipeline 不會有 WAR、WAW hazard？
+- Structural hazard 為什麼通常在設計階段就該避免，而不是靠執行期偵測處理？
+
+---
+
+# Summary
+
+Hazard 分 Structural（硬體資源衝突，設計時避免）、Data（RAW，5-stage in-order pipeline 中靠 `forwarding`/`stall` 處理）、Control（分支方向未定前已預先抓取指令，靠 `branch_prediction`/`speculation` 處理）三類，需要對症下藥的不同對策。

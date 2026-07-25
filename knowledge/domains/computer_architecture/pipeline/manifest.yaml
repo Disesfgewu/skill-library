@@ -1,0 +1,63 @@
+# pipeline/ sub-domain manifest
+#
+# Dependency graph between this sub-domain's topic skills. The sub-domain
+# router.skill resolves `requires` transitively before loading the skill a
+# question actually asked about; `optional` is loaded only if the question's
+# depth calls for it.
+
+pipeline_overview:
+  requires: []
+  optional: []
+
+pipeline_register:
+  requires:
+    - pipeline_overview
+  optional: []
+
+pipeline_hazard:
+  requires:
+    - pipeline_overview
+    - pipeline_register
+  optional: []
+  # forward reference: conceptually also assumes a single-cycle datapath
+  # baseline (domains/computer_architecture/datapath/, status: planned).
+
+forwarding:
+  requires:
+    - pipeline_overview
+    - pipeline_hazard
+  optional: []
+  # forward reference: domains/computer_architecture/datapath/ (planned)
+
+stall:
+  requires:
+    - pipeline_overview
+    - pipeline_hazard
+  optional:
+    - forwarding
+    # stall is often explained as forwarding's fallback, so loading
+    # forwarding alongside it gives fuller context when the question
+    # is comparative ("why stall instead of forward here?").
+
+bubble:
+  requires:
+    - pipeline_overview
+    - pipeline_hazard
+    - stall
+  optional: []
+
+branch_prediction:
+  requires:
+    - pipeline_overview
+    - pipeline_hazard
+  optional:
+    - stall
+    - bubble
+
+speculation:
+  requires:
+    - pipeline_overview
+    - pipeline_hazard
+    - branch_prediction
+  optional:
+    - bubble
